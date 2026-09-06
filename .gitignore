@@ -1,0 +1,35 @@
+
+# ==========================================
+# Development
+# ==========================================
+
+.old_py/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# macOS
+.DS_Store
+
+# ==========================================
+# Large generated analysis files
+# ==========================================
+
+# Cached spectra (very large)
+distanceMatrix_*/spectra.npy
+
+# Cached frequency axis
+distanceMatrix_*/freqs.npy
+
+# Cache files
+distanceMatrix_*/sha256_cache.json
+
+# ==========================================
+# Optional temporary files
+# ==========================================
+
+*.tmp
+*.bak
+*~
