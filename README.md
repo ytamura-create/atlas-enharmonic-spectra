@@ -6,8 +6,8 @@ The dataset provides standardized recordings across the playable range of each i
 
 ## Features
 
-* **26 instrument categories**, including woodwinds, brass, strings, and reference signals.
-* **973 WAV recordings** covering chromatic long tones.
+* **20 instrument categories**, including woodwinds, brass, strings, and reference signals (expect constant updates).
+* **917 WAV recordings** covering chromatic long tones (expect constant updates).
 * Standardized file naming with written pitch, concert pitch, and performance-condition metadata where applicable.
 * Analysis scripts for:
 
