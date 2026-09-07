@@ -11,12 +11,12 @@ import seaborn as sns
 # ==================================================
 
 DISTANCE_MATRIX = (
-    "~/yusei/database_chromatic-longtones/distanceMatrix_L2/"
+    "~/yusei/database_chromatic-longtones/distanceMatrix_L1/"
     # "./distanceMatrix_fl_cl/"
     "distance_matrix_raw.csv"
 )
 
-OUT_DIR = "./distanceMatrix_L2"
+OUT_DIR = "./distanceMatrix_L1"
 
 
 # ==================================================
@@ -49,7 +49,11 @@ DISPLAY_GROUPS = [
     "fg",
     "basstrb",
     "basstrb_mute-straight",
+    "basstrb_mute-straightMetal",
     "basstrb_mute-cup",
+    "basstrb_mute-harmonNOstem",
+    "basstrb_mute-harmonStemmed",
+    "basstrb_mute-bucket",
     "va",
     # "gauss_sigma-002.5%"
 ]
