@@ -1,10 +1,12 @@
 # Klangfarbenatlas
 
-**Klangfarbenatlas** is a research dataset of chromatic long-tone recordings from orchestral instruments, designed for timbre analysis, spectral geometry, and Wasserstein-distance-based studies of musical timbre.
+**Klangfarbenatlas** is a research dataset of chromatic longtone recordings from musical instruments, designed for Klangfarbenharmonielehre, spectral geometry, and Wasserstein-distance-based studies of musical timbre.
 
-The dataset provides standardized recordings across the playable range of each instrument, together with accompanying analysis scripts and distance-matrix generation tools. It serves as the experimental foundation for the geometric harmony framework introduced in [*Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*](https://arxiv.org/abs/2608.28026), where instrumental timbres are modeled as elements of a metric space using Wasserstein distances.
+The dataset provides standardized recordings across the playable range of each instrument, together with accompanying analysis scripts and distance matrix generation tools. It serves as the experimental foundation for the geometric harmony framework introduced in [*Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*](https://arxiv.org/abs/2608.28026), where instrumental timbres are modeled as elements of a metric space using Wasserstein distances.
 
-## Features
+![L1 Wasserstein distance matrix](distanceMatrix_L1/distance_matrix_selected_heatmap.png)
+
+## ✨ Features
 
 * **24 instrument categories**, including woodwinds, brass, strings, and reference signals (expect constant updates).
 * **1141 WAV recordings** covering chromatic long tones (expect constant updates).
@@ -15,27 +17,29 @@ The dataset provides standardized recordings across the playable range of each i
   * L1 and L2 Wasserstein distance computation
 * Precomputed distance matrices for multiple Wasserstein variants.
 
-## Repository Structure
+## 📁 Repository Structure
 
 ```
 Klangfarbenatlas/
 ├── fl/                  # Flute
 ├── ob/                  # Oboe
-├── cl-inA/              # Clarinet in A
+├── cl-inEs/             # Clarinet in E♭
 ├── cl-inB/              # Clarinet in B♭
 ├── basscl/              # Bass Clarinet
 ├── va/                  # Viola
 ├── ...
 ├── distanceMatrix_L1/
 ├── distanceMatrix_L2/
+├── distanceMatrix_lbL1/
+├── distanceMatrix_lbL2/
 ├── py00_wasserstein_calcDistance_FFT.py
 └── py01_wasserstein_visualize_distanceMatrix_*.py
 
 ````
 
-Each instrument directory contains chromatic long-tone recordings. Some instruments additionally include alternative fingerings, mute conditions, or performance variants.
+Each instrument directory contains chromatic longtone recordings. Some instruments additionally include alternative fingerings, mute conditions, or other performance variants.
 
-## File Naming
+## 🏷️ File Naming
 
 Examples:
 
@@ -54,22 +58,29 @@ Depending on the instrument, filenames may encode:
 - mute type (`mute-*`)
 - performance variant
 
-## Research Background
+## 🎼 Research Background
 
-Western music theory traditionally represents notes primarily through pitch. **Klangfarbenatlas** extends this perspective by providing a systematic corpus of instrumental timbres suitable for metric-space analyses.
+Since Helmholtz established the physical foundations of musical acoustics in the nineteenth century, musical timbre has occupied an increasingly central place in musical thought. Schönberg's concept of **Klangfarbenmelodie** proposed that changes of instrumental color could themselves function as musical structure, while later composers such as Pierre Schaeffer, Karlheinz Stockhausen, and György Ligeti further expanded timbre into a fundamental compositional parameter. Yet even after the emergence of digital computation and modern signal processing in the post-war era, a quantitative framework that systematically connected timbre analysis to practical composition, orchestration, and harmonic thinking remained limited. Most previous approaches primarily characterized the properties of individual spectra. **Klangfarbenatlas instead places the measurable difference between two timbres at the center of analysis**, treating timbral transformation itself as the primary object of study. In this perspective, geometry emerges not from isolated sounds but from the network of relations between them.
 
-The accompanying research introduces **geometric harmony**, in which normalized spectra are compared using Wasserstein distance, allowing timbral relationships between individual notes and instrumental combinations to be analyzed within a common geometric framework while remaining compatible with conventional harmonic theory.
+This project deliberately relies **only on physical observables**, without incorporating perceptual ratings or other cognitive variables. Each recording is decomposed into its frequency spectrum, and the normalized spectrum is interpreted as a probability density distributed along the cochlear partition. This representation is inspired by the physiological mechanism of frequency-selective filtering in the basilar membrane before higher-level auditory cognition. The implementation in this repository employs **FFT-based spectral decomposition** for computational efficiency and reproducibility. Although FFT is not the biological mechanism performed by the cochlea itself, it serves as a practical approximation of the same frequency-separation principle.
 
-The dataset was specifically developed to support investigations such as:
+Recent developments in **Wasserstein geometry** have attracted increasing attention in information geometry, statistics, and machine learning because they endow probability distributions with a meaningful geometric structure through optimal transport. This perspective, pioneered in part by the convergence of optimal transport theory with modern information geometry—including recent developments associated with Shun-ichi Amari and collaborators—makes it possible to compare probability distributions by the cost of transforming one into another, rather than by pointwise differences alone. Within this framework, timbral change can be interpreted as the **minimum transport cost required to transform one spectral distribution into another**, allowing musical timbres to be compared through the physical displacement of spectral energy rather than isolated spectral descriptors. See [*Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*](https://arxiv.org/abs/2608.28026).
 
-- timbral affinity between instruments
-- orchestral blend and separation
-- clarinet throat-tone analysis
-- spectral geometry
-- persistent homology of timbre spaces
-- Wasserstein-based chord metrics
+While this dataset also provides precomputed analyses using L2-Wasserstein distance and logarithmic-frequency variants, the accompanying research primarily adopts the **L1-Wasserstein distance** because it preserves two physically meaningful properties simultaneously: the conservation of spectral mass and the total amount of transport required to transform one timbre into another. Rather than treating frequency bins as independent coordinates, L1-Wasserstein interprets spectral change as the cumulative displacement of acoustic energy across the frequency axis, making it particularly suitable for describing continuous timbral transformations.
 
-## Citation
+For normalized spectra $P$ and $Q$ in one dimension, the L1-Wasserstein distance is defined as
+
+$$
+W_1(P,Q)=\int_{-\infty}^{\infty}\left|F_P(x)-F_Q(x)\right|\ \mathrm{d}x,
+$$
+
+where $F_P$ and $F_Q$ denote the cumulative distribution functions of the two normalized spectra. Unlike pointwise spectral differences, this formulation preserves the total spectral probability while measuring **how much spectral mass must be transported, and how far**, to transform one timbre into another. In other words, timbral difference is represented not by isolated spectral peaks but by the minimum physical work required to rearrange the entire spectral distribution.
+
+The accompanying research introduces a metric-space framework for **Klangfarbenakkord** and **Klangfarbenharmonie**, in which instrumental timbres become elements of a common geometric space connected by optimal transport while remaining compatible with conventional harmonic theory. By expressing timbral relationships as measurable physical distances, the framework makes it possible to identify problematic orchestral blends, quantify timbral convergence and divergence within ensembles, and support orchestration and composition inspired by the serial treatment of timbre in **Klangfarbenmelodie**, extending these ideas toward a systematic practice of **Klangfarbenharmonie**.
+
+In this sense, **Klangfarbenatlas** is not merely a collection of recordings, but a cartography of timbral transformations—a space in which compositional decisions can be explored through measurable relationships between sounds.
+
+## 📖 Citation
 
 If you use this dataset, please cite the accompanying paper.
 
