@@ -29,7 +29,7 @@ TARGET_SR = 96000
 # "lbL2" : log-frequency × 2-Wasserstein
 # ==================================================
 
-WASSERSTEIN_MODE = "lbL2"
+WASSERSTEIN_MODE = "L1"
 OUT_DIR = f"./distanceMatrix_{WASSERSTEIN_MODE}"
 
 
@@ -59,7 +59,11 @@ TARGET_DIRS = [
     "fh_tube-B",
     "basstrb",
     "basstrb_mute-straight",
+    "basstrb_mute-straightMetal",
     "basstrb_mute-cup",
+    "basstrb_mute-harmonNOstem",
+    "basstrb_mute-harmonStemmed",
+    "basstrb_mute-bucket",
     "va",
     "gauss_sigma-002.5%"
 ]

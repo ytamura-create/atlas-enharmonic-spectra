@@ -16,6 +16,10 @@ group_index,group_name,size,start,end
 14,fh_tube-B,11,601,612
 15,basstrb,56,612,668
 16,basstrb_mute-straight,56,668,724
-17,basstrb_mute-cup,56,724,780
-18,va,40,780,820
-19,gauss_sigma-002.5%,97,820,917
+17,basstrb_mute-straightMetal,56,724,780
+18,basstrb_mute-cup,56,780,836
+19,basstrb_mute-harmonNOstem,56,836,892
+20,basstrb_mute-harmonStemmed,56,892,948
+21,basstrb_mute-bucket,56,948,1004
+22,va,40,1004,1044
+23,gauss_sigma-002.5%,97,1044,1141
