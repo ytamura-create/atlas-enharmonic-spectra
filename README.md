@@ -20,9 +20,6 @@ The dataset provides standardized recordings across the playable range of each i
 ## 📁 Repository Structure
 
 ```
-└── wav
-    ├── altofl
-    │   ├── altofl000_conc-G3_writ-C4.wav
 Klangfarbenatlas/
 ├── wav/
 │   ├── fl/              # Flute
