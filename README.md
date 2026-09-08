@@ -1,3 +1,9 @@
+> Klangfarbenmelodien! Welche feinen Sinne, die hier unterscheiden, welcher hochentwickelte Geist, der an so subtilen Dingen Vergnügen finden mag!
+> 
+> Wer wagt hier Theorie zu fordern!
+>
+> -- Arnold Schönberg, *Harmonielehre* (1911)
+
 # Klangfarbenatlas
 
 **Klangfarbenatlas** is a research dataset of chromatic longtone recordings from musical instruments, designed for Klangfarbenharmonielehre, spectral geometry, and Wasserstein-distance-based studies of musical timbre.
@@ -61,19 +67,23 @@ Depending on the instrument, filenames may encode:
 
 ## 🎼 Research Background
 
-In *Harmonielehre* (1911), Arnold Schönberg proposed that musical timbre could become a structural principle of music comparable to melody itself. He envisioned **Klangfarbenmelodie** as
+In *Harmonielehre* (1911), Arnold Schönberg proposed that timbre could become a structural principle of music comparable to melody itself. He argued that it should be possible to create
 
-> “progressions whose relations with one another work with a kind of logic entirely equivalent to that logic which satisfies us in the melody of pitches.”
+> *"...Folgen herzustellen, deren Beziehung untereinander mit einer Art Logik wirkt, ganz äquivalent jener Logik, die uns bei der Melodie der Klanghöhen genügt."*
+>
+> *"...progressions whose relations with one another work with a kind of logic entirely equivalent to that logic which satisfies us in the melody of pitches."*
 
-before adding,
+He immediately acknowledged that this vision might seem speculative, writing
 
-> “That has the appearance of a futuristic fantasy and is probably just that. But I have absolute faith that it will come about.”
+> *"Das scheint eine Zukunftsphantasie und ist es wahrscheinlich auch. Aber eine, von der ich fest glaube, daß sie sich verwirklichen wird."*
+>
+> *"That has the appearance of a futuristic fantasy and is probably just that. But it is one which, I firmly believe, will be realized."*
 
-More than a century later, this "futuristic fantasy" continues to inspire composers—from Webern to Schaeffer, Stockhausen, Ligeti, and many others—yet a quantitative framework capable of connecting timbral analysis directly to composition, orchestration, and harmonic thinking has remained limited.
+More than a century later, this **Zukunftsphantasie** continues to inspire composers—from Webern to Schaeffer, Stockhausen, Ligeti, and many others—yet a quantitative framework capable of connecting timbral analysis directly to composition, orchestration, and harmonic thinking has remained limited.
 
 **Klangfarbenatlas** approaches this challenge from a different perspective. Rather than describing individual spectra in isolation, it places the measurable **difference between two timbres** at the center of analysis, treating timbral transformation itself as the primary object of study. In this perspective, geometry emerges not from isolated sounds but from the network of relations between them, providing a measurable counterpart to Schönberg's search for a logic of timbral succession.
 
-Unlike approaches based on perceptual ratings or other cognitive variables, this project relies **exclusively on physical observables**. Each recording is decomposed into its frequency spectrum, and the normalized spectrum is interpreted as a probability density distributed along the cochlear partition. This representation is inspired by the frequency-selective filtering performed by the basilar membrane before higher-level auditory cognition. The implementation in this repository employs **FFT-based spectral decomposition** for computational efficiency and reproducibility. Although FFT is not itself the biological mechanism of the cochlea, it serves as a practical approximation of the same principle of frequency separation.
+This project deliberately relies **exclusively on physical observables**, without incorporating perceptual ratings or other cognitive variables. Each recording is decomposed into its frequency spectrum, and the normalized spectrum is interpreted as a probability density distributed along the cochlear partition. This representation is inspired by the frequency-selective filtering performed by the basilar membrane before higher-level auditory cognition. The implementation in this repository employs **FFT-based spectral decomposition** for computational efficiency and reproducibility. Although FFT is not itself the biological mechanism of the cochlea, it serves as a practical approximation of the same principle of frequency separation.
 
 Recent developments in **Wasserstein geometry** have attracted increasing attention in information geometry, statistics, and machine learning because they endow probability distributions with a meaningful geometric structure through optimal transport. In particular, recent work associated with **Shun-ichi Amari** and collaborators has highlighted how optimal transport complements classical Fisher-information geometry, extending geometric methods for probability distributions beyond coordinate-based descriptions. Within this framework, timbral change can be interpreted as the **minimum transport cost required to transform one spectral distribution into another**, allowing musical timbres to be compared through the physical displacement of spectral energy rather than isolated spectral descriptors.
 
