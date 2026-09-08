@@ -11,8 +11,7 @@ import seaborn as sns
 # ==================================================
 
 DISTANCE_MATRIX = (
-    "~/yusei/database_chromatic-longtones/distanceMatrix_L1/"
-    # "./distanceMatrix_fl_cl/"
+    "./distanceMatrix_L1/"
     "distance_matrix_raw.csv"
 )
 

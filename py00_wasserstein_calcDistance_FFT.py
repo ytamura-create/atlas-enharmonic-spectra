@@ -14,7 +14,7 @@ import librosa
 # ==================================================
 
 ROOT_DIR = os.path.expanduser(
-    "~/yusei/database_chromatic-longtones"
+    "./wav/"
 )
 
 TARGET_SR = 96000

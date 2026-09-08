@@ -13,18 +13,16 @@ import seaborn as sns
 # ==================================================
 
 DISTANCE_MATRIX = (
-    # "~/yusei/database_chromatic-longtones/"
-    # "distanceMatrix_L1/"
-    "./distanceMatrix_fl_cl/"
+    "./distanceMatrix_L1/"
     "distance_matrix_raw.csv"
 )
 
 GROUP_JSON = (
-    "./distanceMatrix_fl_cl_square/"
+    "./distanceMatrix_L1/"
     "display_groups.json"
 )
 
-OUT_DIR = "./distanceMatrix_fl_cl_square"
+OUT_DIR = "./distanceMatrix_L1"
 
 
 # ==================================================
@@ -36,8 +34,8 @@ OUT_DIR = "./distanceMatrix_fl_cl_square"
 # ==================================================
 
 DISPLAY_GROUPS = [
-    "fl",
-    "cl-inB"
+    # "fl",
+    # "cl-inB"
 ]
 
 

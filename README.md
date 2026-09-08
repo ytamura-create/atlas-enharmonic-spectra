@@ -20,14 +20,18 @@ The dataset provides standardized recordings across the playable range of each i
 ## 📁 Repository Structure
 
 ```
+└── wav
+    ├── altofl
+    │   ├── altofl000_conc-G3_writ-C4.wav
 Klangfarbenatlas/
-├── fl/                  # Flute
-├── ob/                  # Oboe
-├── cl-inEs/             # Clarinet in E♭
-├── cl-inB/              # Clarinet in B♭
-├── basscl/              # Bass Clarinet
-├── va/                  # Viola
-├── ...
+├── wav/
+│   ├── fl/              # Flute
+│   ├── ob/              # Oboe
+│   ├── cl-inEs/              # Clarinet in E♭
+│   ├── cl-inB/              # CLarinet in B♭
+│   ├── basscl/          # Bass Clarinet
+│   ├── va/              # Viola
+│   └── ...              # and more!
 ├── distanceMatrix_L1/
 ├── distanceMatrix_L2/
 ├── distanceMatrix_lbL1/
