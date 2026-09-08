@@ -60,18 +60,28 @@ Depending on the instrument, filenames may encode:
 
 ## 🎼 Research Background
 
-Since Helmholtz established the physical foundations of musical acoustics in the nineteenth century, musical timbre has occupied an increasingly central place in musical thought. Schönberg's concept of **Klangfarbenmelodie** proposed that changes of instrumental color could themselves function as musical structure, while later composers such as Pierre Schaeffer, Karlheinz Stockhausen, and György Ligeti further expanded timbre into a fundamental compositional parameter. Yet even after the emergence of digital computation and modern signal processing in the post-war era, a quantitative framework that systematically connected timbre analysis to practical composition, orchestration, and harmonic thinking remained limited. Most previous approaches primarily characterized the properties of individual spectra. **Klangfarbenatlas instead places the measurable difference between two timbres at the center of analysis**, treating timbral transformation itself as the primary object of study. In this perspective, geometry emerges not from isolated sounds but from the network of relations between them.
+In *Harmonielehre* (1911), Arnold Schönberg proposed that musical timbre could become a structural principle of music comparable to melody itself. He envisioned **Klangfarbenmelodie** as
 
-This project deliberately relies **only on physical observables**, without incorporating perceptual ratings or other cognitive variables. Each recording is decomposed into its frequency spectrum, and the normalized spectrum is interpreted as a probability density distributed along the cochlear partition. This representation is inspired by the physiological mechanism of frequency-selective filtering in the basilar membrane before higher-level auditory cognition. The implementation in this repository employs **FFT-based spectral decomposition** for computational efficiency and reproducibility. Although FFT is not the biological mechanism performed by the cochlea itself, it serves as a practical approximation of the same frequency-separation principle.
+> “progressions whose relations with one another work with a kind of logic entirely equivalent to that logic which satisfies us in the melody of pitches.”
 
-Recent developments in **Wasserstein geometry** have attracted increasing attention in information geometry, statistics, and machine learning because they endow probability distributions with a meaningful geometric structure through optimal transport. This perspective, pioneered in part by the convergence of optimal transport theory with modern information geometry—including recent developments associated with Shun-ichi Amari and collaborators—makes it possible to compare probability distributions by the cost of transforming one into another, rather than by pointwise differences alone. Within this framework, timbral change can be interpreted as the **minimum transport cost required to transform one spectral distribution into another**, allowing musical timbres to be compared through the physical displacement of spectral energy rather than isolated spectral descriptors. See [*Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*](https://arxiv.org/abs/2608.28026).
+before adding,
 
-While this dataset also provides precomputed analyses using L2-Wasserstein distance and logarithmic-frequency variants, the accompanying research primarily adopts the **L1-Wasserstein distance** because it preserves two physically meaningful properties simultaneously: the conservation of spectral mass and the total amount of transport required to transform one timbre into another. Rather than treating frequency bins as independent coordinates, L1-Wasserstein interprets spectral change as the cumulative displacement of acoustic energy across the frequency axis, making it particularly suitable for describing continuous timbral transformations.
+> “That has the appearance of a futuristic fantasy and is probably just that. But I have absolute faith that it will come about.”
 
-For normalized spectra $P$ and $Q$ in one dimension, the L1-Wasserstein distance is defined as
+More than a century later, this "futuristic fantasy" continues to inspire composers—from Webern to Schaeffer, Stockhausen, Ligeti, and many others—yet a quantitative framework capable of connecting timbral analysis directly to composition, orchestration, and harmonic thinking has remained limited.
+
+**Klangfarbenatlas** approaches this challenge from a different perspective. Rather than describing individual spectra in isolation, it places the measurable **difference between two timbres** at the center of analysis, treating timbral transformation itself as the primary object of study. In this perspective, geometry emerges not from isolated sounds but from the network of relations between them, providing a measurable counterpart to Schönberg's search for a logic of timbral succession.
+
+Unlike approaches based on perceptual ratings or other cognitive variables, this project relies **exclusively on physical observables**. Each recording is decomposed into its frequency spectrum, and the normalized spectrum is interpreted as a probability density distributed along the cochlear partition. This representation is inspired by the frequency-selective filtering performed by the basilar membrane before higher-level auditory cognition. The implementation in this repository employs **FFT-based spectral decomposition** for computational efficiency and reproducibility. Although FFT is not itself the biological mechanism of the cochlea, it serves as a practical approximation of the same principle of frequency separation.
+
+Recent developments in **Wasserstein geometry** have attracted increasing attention in information geometry, statistics, and machine learning because they endow probability distributions with a meaningful geometric structure through optimal transport. In particular, recent work associated with **Shun-ichi Amari** and collaborators has highlighted how optimal transport complements classical Fisher-information geometry, extending geometric methods for probability distributions beyond coordinate-based descriptions. Within this framework, timbral change can be interpreted as the **minimum transport cost required to transform one spectral distribution into another**, allowing musical timbres to be compared through the physical displacement of spectral energy rather than isolated spectral descriptors.
+
+While this dataset also provides precomputed analyses using L2-Wasserstein distance and logarithmic-frequency variants, the accompanying research primarily adopts the **L1-Wasserstein distance** because it simultaneously preserves two physically meaningful properties: conservation of spectral mass and the total amount of transport required to transform one timbre into another. Instead of treating frequency bins as independent coordinates, L1-Wasserstein interprets spectral change as the cumulative displacement of acoustic energy across the frequency axis, making it particularly suitable for describing continuous timbral transformations.
+
+For normalized spectra in one dimension, the L1-Wasserstein distance is defined as
 
 $$
-W_1(P,Q)=\int_{-\infty}^{\infty}\left|F_P(x)-F_Q(x)\right|\ \mathrm{d}x,
+W_1(P,Q)=\int_{-\infty}^{\infty}\left|F_P(x)-F_Q(x)\right|dx,
 $$
 
 where $F_P$ and $F_Q$ denote the cumulative distribution functions of the two normalized spectra. Unlike pointwise spectral differences, this formulation preserves the total spectral probability while measuring **how much spectral mass must be transported, and how far**, to transform one timbre into another. In other words, timbral difference is represented not by isolated spectral peaks but by the minimum physical work required to rearrange the entire spectral distribution.
@@ -96,3 +106,9 @@ If you use this dataset, please cite the accompanying paper.
 ```
 
 Paper: [Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1](https://arxiv.org/abs/2608.28026)
+
+## 📖 References
+
+1. Arnold Schönberg. *Harmonielehre*. Universal Edition, Vienna, 1911.
+1. Shun-ichi Amari. *Information Geometry and Its Applications*. Springer, 2016.
+1. [Yusei Tamura, Shigekazu Ishihara, and Ken Ito. *Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*. arXiv:2608.28026.](https://arxiv.org/abs/2608.28026)
