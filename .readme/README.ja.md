@@ -187,4 +187,4 @@ $$
 1. Shun-ichi Amari. Differential geometry of curved exponential families—curvatures and information loss. *The Annals of Statistics* **10**(2), pp. 357–385 (1982).
 1. Shun-ichi Amari. Differential-geometrical methods in statistics (Lecture Notes in Statistics, **28**). *Springer-Verlag* (1985).
 1. [李 珍咏，伊東 乾．Sparse FFT：新しい高分解能周波数解析とその応用．*JASTICE* **8**(2), pp.188–193 (2021/2022)](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/)
-1. [Yusei Tamura, Shigekazu Ishihara, and Ken Ito. Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1. *arXiv*, arXiv:2608.28026.](https://arxiv.org/abs/2608.28026)
+1. [Yusei Tamura, Shigekazu Ishihara, and Ken Ito. Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1. *arXiv*, arXiv:2608.28026 (2026).](https://arxiv.org/abs/2608.28026)
