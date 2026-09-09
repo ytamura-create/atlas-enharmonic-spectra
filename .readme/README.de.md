@@ -14,7 +14,7 @@ Im 21. Jahrhundert ermöglicht die **Informationsgeometrie** von **Shun-ichi Ama
 
 # Atlas Enharmonic Spectra
 
-*„Klangfarbenharmonie“ — Invitation to the spectral tuning for harmonic ensembles.*
+*„Klangfarbenharmonie“ — Spektrale Stimmung für harmonische Ensembles.*
 
 ---
 
@@ -24,7 +24,7 @@ Neben standardisierten Aufnahmen über den gesamten praktischen Tonumfang jedes 
 
 Es dient als praktisches Hilfsmittel für Komposition, Instrumentation, Aufführung, Probenarbeit, Übung und sogar die Auswahl von Dämpfern, indem es den Vergleich von Klangfarben über Tonhöhe, Instrument und Spielweise hinweg ermöglicht.
 
-![L1 Wasserstein distance matrix](distanceMatrix_L1/distance_matrix_selected_heatmap.png)
+![L1 Wasserstein distance matrix](../distanceMatrix_L1/distance_matrix_selected_heatmap.png)
 
 ## ✨ Merkmale
 
@@ -90,7 +90,7 @@ Je nach Instrument können Dateinamen folgende Informationen enthalten:
 
 Führen Sie die Python-Programme gemäß dem folgenden Flussdiagramm aus, um Wasserstein-Distanzmatrizen als CSV-Dateien und PNG-Heatmaps zu erzeugen.
 
-![Ausführungsablauf](.readme/flowchart.svg)
+![Ausführungsablauf](flowchart.svg)
 
 ## 🎼 Forschungshintergrund
 

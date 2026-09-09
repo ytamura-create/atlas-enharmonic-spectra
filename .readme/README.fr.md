@@ -22,8 +22,6 @@ Au XXIe siècle, la théorie de la **géométrie de l'information** de **Shun-ic
 
 *« Klangfarbenharmonie » — Invitation à l'accordage spectral pour les ensembles harmoniques.*
 
-*« Harmonie des timbres » — Accordage spectral pour les ensembles harmoniques.*
-
 ---
 
 **Atlas Enharmonic Spectra** est un jeu de données chromatique de sons tenus instrumentaux et vocaux, accompagné d'un système de calcul en géométrie de l'information musicale, développé pour faire progresser **Klangfarbenharmonie** et **Klangfarbenakkord** dans la pratique des ensembles.
@@ -32,7 +30,7 @@ Outre des enregistrements normalisés couvrant toute l'étendue pratique de chaq
 
 Il est conçu comme un outil pratique destiné à la composition, à l'orchestration et à l'interprétation, permettant de comparer les timbres au-delà des différences de hauteur, d'instrument et de technique de jeu.
 
-![L1 Wasserstein distance matrix](distanceMatrix_L1/distance_matrix_selected_heatmap.png)
+![L1 Wasserstein distance matrix](../distanceMatrix_L1/distance_matrix_selected_heatmap.png)
 
 ## ✨ Caractéristiques
 
@@ -98,7 +96,7 @@ Selon l'instrument, le nom de fichier peut contenir :
 
 Exécutez les programmes Python en suivant l'organigramme ci-dessous afin de générer des matrices de distances de Wasserstein sous forme de fichiers CSV et de cartes thermiques PNG.
 
-![Procédure d'exécution](.readme/flowchart.svg)
+![Procédure d'exécution](flowchart.svg)
 
 ## 🎼 Contexte de la recherche
 
