@@ -24,7 +24,7 @@ In addition to standardized recordings covering the practical range of each inst
 
 The repository is intended as a practical support tool for composition, orchestration, and performance, allowing timbres to be compared across differences of pitch, instrument, and playing technique.
 
-![L1 Wasserstein distance matrix](../distanceMatrix_L1/distance_matrix_selected_heatmap.png)
+![L1 Wasserstein distance matrix](distanceMatrix_L1/distance_matrix_selected_heatmap.png)
 
 ## ✨ Features
 
