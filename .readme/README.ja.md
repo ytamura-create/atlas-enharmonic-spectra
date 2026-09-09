@@ -31,8 +31,8 @@ Language: | [English](../README.md) | 日本語 | [Français](README.fr.md) | [D
 - **24種類の楽器カテゴリ**（木管・金管・弦楽器・基準信号など。継続的に追加予定）
 - **1141件のWAV録音**（半音階ロングトーン。継続的に追加予定）
     * サンプリング周波数： $f_s=96\ \mathrm{kHz}$、
-    * サンプル数： $ N = 2^{20} $、
-    * ∴ データ長： $ N/f_s = 10.\ 922\ 666...\ \ \mathrm{sec}$ に統一。
+    * サンプル数： $N = 2^{20}$、
+    * ∴ データ長： $N/f_s = 10.\ 922\ 666...\ \ \mathrm{sec}$ に統一。
     * [*Sparse FFT：新しい高分解能周波数解析とその応用*](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/) を参照のこと。
 - 記譜音・実音・演奏条件などを含む統一的なファイル命名規則
 - スペクトル間 L1・L2 Wasserstein距離の計算スクリプト
@@ -141,7 +141,8 @@ $$W_1(P,Q)=\sum_i\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\Delta f$$
 return np.sum(np.abs(cdf_P - cdf_Q)) * df
 ```
 
-として算出している。$\Delta f$（`df`）は FFT の周波数分解能
+として算出している。
+$\Delta f$（`df`）は FFT の周波数分解能
 
 $$
 \Delta f = \frac{f_s}{N} \approx 0.092\ \mathrm{Hz}
