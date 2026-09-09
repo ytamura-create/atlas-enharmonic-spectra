@@ -27,6 +27,13 @@ distanceMatrix_*/freqs.npy
 distanceMatrix_*/sha256_cache.json
 
 # ==========================================
+# Files for editing
+# ==========================================
+
+.readme_lang/flowchart.drawio
+readme.old.md
+
+# ==========================================
 # Optional temporary files
 # ==========================================
 
