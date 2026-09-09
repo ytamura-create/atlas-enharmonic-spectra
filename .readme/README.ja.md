@@ -1,28 +1,36 @@
-Language: | [English](../README.md) | 日本語 | [Français](README.fr.md) | [Deutsch](README.de.md)
+言語: | [English](../README.md) | 日本語 | [Français](README.fr.md) | [Deutsch](README.de.md)
 
-> Melodies of timbre! What refined senses are able to distinguish these, what a highly developed mind can take pleasure in such subtle things!
-> 
-> Who would dare to demand a theory here!
-> 
-> — Arnold Schoenberg, *Theory of Harmony* (1911)
+> Klangfarbenmelodien! Welche feinen Sinne, die hier unterscheiden, welcher hochentwickelte Geist, der an so subtilen Dingen Vergnügen finden mag!
+>
+> Wer wagt hier Theorie zu fordern!
+>
+> — Arnold Schönberg, *Harmonielehre* (1911)
 
-作曲家 **A. シェーンベルク** は師友であった作曲家＝指揮者 **G. マーラー** の死を悼みつつ公刊した「和声学 Harmonielehre」(1911)の末尾に上のように記した。
+> 『音色の旋律』！如何なる繊細な感覚が、この差異を聴き分けるか！如何なる高度な精神が、極微の響きの違いに歓びを見出すだろうか！
+>
+> 誰かここで新理論を追求しようという者はないか？
+>
+> — A. シェーンベルク，「*和声学*」(1911)
 
-この問いに、かつて **A. ベルク** も **A. ヴェーベルン** も、また第二次世界大戦後には **L. ノーノ**、**P. ブーレーズ** も **K. シュトックハウゼン** も正面から挑みつつ、生涯に亘って適切な方法を構築することが出来なかった。彼らは科学史に先んじすぎていたのだ。
+作曲家 **A. シェーンベルク** は師友であった作曲家＝指揮者 **G. マーラー** の死を悼みつつ公刊した「和声学 Harmonielehre」(1911) の末尾に上のように記した。
 
-21世紀、我々は **甘利俊一**教授 の「**情報幾何**」の方法（1982/85～）によって、正確な Hz 単位の量として「音色と音色の距離」を測ることができる。そこから「音色の測地線」「和音と和声の幾何学」そして本質的に、因襲的な「音高の和声」を超える、シェーンベルクが夢想した「*音色の和声学*」が可能になる。我々は以下でこれを展開し、歴史の扉を一つ大きく開くこととしよう。
+この問いに、かつて **A. ベルク** も **A. ヴェーベルン** も、また第二次世界大戦後には **L. ノーノ**、**P. ブーレーズ** も **K. シュトックハウゼン** も正面から挑みつつ、生涯に亘って適切な方法を構築することが出来なかった。彼らは、また音楽は、科学史に先んじすぎていたのだ。
 
-# Atlas Enharmonic Spectra
+21世紀、我々は **甘利俊一**教授 の「**情報幾何**」の方法（1982/85～）によって、正確な Hz 単位の量として「音色と音色の距離」を測ることができる。そこから「音色の測地線」「和音と和声の幾何学」そして、因襲的な「音高の和声」を超える、シェーンベルクが夢想した「*音色の和声学*」が可能になる。我々は以下でこれを展開し、歴史の扉を一つ開くこととしよう。
+
+# Atlas Enharmonic Spectra — アトラス・エンハーモニック・スぺクトラ
 
 *“Klangfarbenharmonie” — Invitation to the spectral tuning for harmonic ensembles.*
+
+*“音色和声” — 合奏を調和させるスペクトルのチューニング*
 
 ---
 
 **Atlas Enharmonic Spectra** は、アンサンブルの音色作りを本質的に進展させる **Klangfarbenharmonie** および **Klangfarbenakkord** のために構築された、器楽ならびに声楽ロングトーンの半音階データセットと音楽の情報幾何演算のシステムです。
 
-各楽器の実用音域全体にわたる標準化された録音に加え、FFTによるスペクトル抽出、Wasserstein距離の計算スクリプト、および事前計算済みの距離行列を収録しています。本リポジトリは、[*Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*](https://arxiv.org/abs/2608.28026) で初めて導入した、正規化スペクトル間の最適輸送によって音色関係を記述する枠組みの実験基盤となるものです。
+各楽器の実用音域全体にわたる標準化された録音に加え、FFTによるスペクトル抽出、正規化スペクトルの固有シャノン・エントロピー、Wasserstein距離の計算スクリプト、および距離行列を収録しています。本リポジトリは、[*Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*](https://arxiv.org/abs/2608.28026) で初めて導入した、正規化スペクトル間の最適輸送によって音色関係を記述する基盤となるものです。
 
-作曲・編曲・演奏の実践において、音高・楽器・奏法の違いを横断しながら音色を比較・検討するための支援ツールとして利用することを目的としています。
+作曲・編曲・演奏の実践において、音高・楽器・奏法の違いを横断しながら音色を比較・検討する支援ツールです。
 
 ![L1 Wasserstein distance matrix](../distanceMatrix_L1/distance_matrix_selected_heatmap.png)
 
@@ -88,9 +96,9 @@ basstrb045_F4_ovt-06_pos-I.wav
 
 Arnold Schönberg は *Harmonielehre*（1911）の中で、
 
-> *"...Folgen herzustellen, deren Beziehung untereinander mit einer Art Logik wirkt, ganz äquivalent jener Logik, die uns bei der Melodie der Klanghöhen genügt."*
+> *"..solche **Folgen** herzustellen, deren Beziehung untereinander mit einer Art Logik wirkt, ganz äquivalent jener Logik, die uns bei der Melodie der Klanghöhen genügt."*
 
-> *「……それら相互の関係が、音高の旋律において私たちを満足させる論理とまったく同等の、一種の論理として働くような連なりを作り出すこと」*
+> *「……それら相互の関係が、音高の旋律において私たちを満足させる論理とまったく同等の、一種の論理として働くような**連なり**を作り出すこと」*
 
 が可能になるだろうと述べた。
 
@@ -100,7 +108,7 @@ Arnold Schönberg は *Harmonielehre*（1911）の中で、
 
 > *「それは未来の幻想のように思われるし、おそらく実際そうなのだろう。しかし私は、それがいつか実現すると固く信じている。」*
 
-この **未来の幻想** はその後、**Webern**、**Schaeffer**、**Stockhausen**、**Ligeti** をはじめとする多くの作曲家へ受け継がれた。特に戦後のセリエリズムは、音高だけでなく音価・強弱・音色までも組織化の対象へと押し広げた。しかし、音色を音高と同じような共通原理の上で横断的に扱う方法は、音楽的な実践の中で十分には確立されなかった。
+この **未来の幻想** はその後、**Webern**、**Messiaen**、**Nono**、**Boulez**、**Stockhausen** をはじめとする多くの作曲家へ受け継がれた。特に戦後のセリエリズムは、音高だけでなく音価・強弱・音色までも組織化の対象へと押し広げた。しかし、音色を音高と同じような共通原理の上で横断的に扱う方法は、音楽的な実践の中で十分には確立されなかった。
 
 この対照は、音高と音色の歴史の違いに由来する。音高については、**ピタゴラス** の振動数比、**G. ツァルリーノ** の純正律、**朱載堉** による12平均律の数学的導出などを通じて、音楽と数学が今日ほど分離していなかった時代から、音を数として関係づける尺度が育まれてきた。一方、こうした音律は音高の関係を定めるものであり、楽器間の音色差や演奏中に連続的に変化する音色を同じ原理で記述するものではなかった。その結果、音高には精密な体系が築かれた一方で、音色にはそれに対応する横断的な尺度が十分には与えられてこなかった。
 
@@ -108,7 +116,7 @@ Arnold Schönberg は *Harmonielehre*（1911）の中で、
 
 ---
 
-解析には認知評価や主観アンケートを用いず、**物理的に観測可能な量のみ** を扱う。各録音は周波数スペクトルへ分解し、正規化したものを、Born の確率解釈に倣い確率密度関数とみなす。このモデルは、蝸牛管が周波数成分を空間的に分波し、基底膜上の有毛細胞がそれを観測する生理機構に着想を得ている。分波には再現性と恣意性の排除のため、高速 Fourier 変換（Fast Fourier Transform, FFT）を用いる。
+解析には認知評価や主観アンケートを用いず、最終的に聴取の認知量に変換する直前までの、**物理的に観測可能な量のみ** を扱う。各録音は周波数スペクトルへ分解し、正規化したものを、Born の確率解釈に倣い確率密度関数とみなす。このモデルは、蝸牛管が周波数成分を空間的に分波し、基底膜上の有毛細胞がそれを観測する生理機構に着想を得ている。分波には再現性と恣意性の排除のため、高速 Fourier 変換（Fast Fourier Transform, FFT）を用いる。
 
 近年、**Wasserstein 幾何** は、確率分布に最適輸送による幾何学構造を与える枠組みとして、情報幾何学・統計学・機械学習で広く用いられている。特に **甘利俊一** らの研究は、最適輸送と情報幾何学の接点を切り開き、確率分布を幾何学的に扱う新たな視点を示した。本リポジトリはこの枠組みを音色解析へ応用し、音色変化を「一つのスペクトル分布から別の分布へスペクトル質量を移すために必要な最小輸送コスト」として記述する。
 
@@ -124,7 +132,7 @@ $$F_P(x) = \int_{-\infty}^x P(y)\ \mathrm dy,\qquad F_Q(x) = \int_{-\infty}^x Q(
 
 である。
 
-**Atlas Enharmonic Spectra** では FFT によって得られる離散スペクトルを扱うため、累積分布を
+**Atlas Enharmonic Spectra** では FFT によって得られる 離散 スペクトルを扱うため、累積分布を
 
 $$F_P[i]=\sum_{j=0}^{i}P[j],\qquad F_Q[i]=\sum_{j=0}^{i}Q[j]$$
 

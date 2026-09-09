@@ -98,7 +98,7 @@ At the same time, he acknowledged that this remained a vision of the future.
 
 > *"It appears to be a fantasy of the future, and probably it is. Yet I firmly believe that it will one day become reality."*
 
-This **Zukunftsphantasie** was inherited by many composers, including **Webern**, **Schaeffer**, **Stockhausen**, and **Ligeti**. Postwar serialism expanded organization beyond pitch to duration, dynamics, and timbre itself. Nevertheless, no method became firmly established within musical practice for treating timbre across instruments by means of a common organizing principle comparable to that of pitch.
+This **fantasy** was inherited by many composers, including **Webern**, **Schaeffer**, **Stockhausen**, and **Ligeti**. Postwar serialism expanded organization beyond pitch to duration, dynamics, and timbre itself. Nevertheless, no method became firmly established within musical practice for treating timbre across instruments by means of a common organizing principle comparable to that of pitch.
 
 This contrast reflects the different historical development of pitch and timbre. For pitch, mathematical descriptions evolved through **Pythagorean** frequency ratios, **Gioseffo Zarlino's** just intonation, and **Zhu Zaiyu's** mathematical derivation of twelve-tone equal temperament. At a time when music and mathematics were far less separated than they are today, these developments established shared quantitative principles for relating pitches. Yet such tuning systems describe relationships among pitches rather than relationships among timbres, and they cannot naturally account for differences between instruments or the continuous evolution of timbre during performance.
 
@@ -125,7 +125,7 @@ F_P(x)=\int_{-\infty}^{x}P(y)\ \mathrm dy,\qquad
 F_Q(x)=\int_{-\infty}^{x}Q(y)\ \mathrm dy.
 $$
 
-Since **Atlas Enharmonic Spectra** works with discrete spectra obtained by FFT, the cumulative distributions are computed as
+Since **Atlas Enharmonic Spectra** works with DISCRETE spectra obtained by FFT, the cumulative distributions are computed as
 
 $$
 F_P[i]=\sum_{j=0}^{i}P[j],\qquad
