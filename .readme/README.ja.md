@@ -32,12 +32,12 @@
 
 作曲・編曲・演奏の実践において、音高・楽器・奏法の違いを横断しながら音色を比較・検討する支援ツールです。
 
-![L1 Wasserstein distance matrix](../distanceMatrix_L1/distance_matrix_selected_heatmap.png)
+![L1 Wasserstein distance matrix](../colormap_L1/distance_matrix_selected_heatmap.png)
 
 ## ✨ 特徴
 
-- **24種類の楽器カテゴリ**（木管・金管・弦楽器・基準信号など。継続的に追加予定）
-- **1141件のWAV録音**（半音階ロングトーン。継続的に追加予定）
+- **31種類の楽器カテゴリ**（木管・金管・弦楽器・基準信号など。継続的に追加予定）
+- **1484件のWAV録音**（半音階ロングトーン。継続的に追加予定）
     * サンプリング周波数： $f_s=96\ \mathrm{kHz}$、
     * サンプル数： $N = 2^{20}$、
     * ∴ データ長： $N/f_s = 10.\ 922\ 666...\ \ \mathrm{sec}$ に統一。

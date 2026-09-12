@@ -24,13 +24,13 @@ Neben standardisierten Aufnahmen über den gesamten praktischen Tonumfang jedes 
 
 Es dient als praktisches Hilfsmittel für Komposition, Instrumentation, Aufführung, Probenarbeit, Übung und sogar die Auswahl von Dämpfern, indem es den Vergleich von Klangfarben über Tonhöhe, Instrument und Spielweise hinweg ermöglicht.
 
-![L1 Wasserstein distance matrix](../distanceMatrix_L1/distance_matrix_selected_heatmap.png)
+![L1 Wasserstein distance matrix](../colormap_L1/distance_matrix_selected_heatmap.png)
 
 ## ✨ Merkmale
 
-- **24 Instrumentenkategorien** (Holzbläser, Blechbläser, Streicher, Referenzsignale u.a.; fortlaufend erweitert)
+- **31 Instrumentenkategorien** (Holzbläser, Blechbläser, Streicher, Referenzsignale u.a.; fortlaufend erweitert)
 
-- **1.141 WAV-Aufnahmen** (chromatische Langtöne; fortlaufend erweitert)
+- **1.484 WAV-Aufnahmen** (chromatische Langtöne; fortlaufend erweitert)
 
   - Abtastrate: $f_s=96\ \mathrm{kHz}$
 

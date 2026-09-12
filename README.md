@@ -24,13 +24,13 @@ In addition to standardized recordings covering the practical range of each inst
 
 It is intended as a practical resource for composition, orchestration, performance, rehearsal, practice, and even mute selection, enabling musicians to compare timbres across pitch, instrument, and playing technique.
 
-![L1 Wasserstein distance matrix](distanceMatrix_L1/distance_matrix_selected_heatmap.png)
+![L1 Wasserstein distance matrix](colormap_L1/distance_matrix_selected_heatmap.png)
 
 ## ✨ Features
 
-- **24 instrument categories** (woodwinds, brass, strings, reference signals, and more; continuously expanding)
+- **31 instrument categories** (woodwinds, brass, strings, reference signals, and more; continuously expanding)
 
-- **1,141 WAV recordings** (chromatic long tones; continuously expanding)
+- **1,484 WAV recordings** (chromatic long tones; continuously expanding)
 
   - Sampling rate: $f_s=96\ \mathrm{kHz}$
   - Number of samples: $N=2^{20}$

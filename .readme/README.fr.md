@@ -30,13 +30,13 @@ Outre des enregistrements normalisés couvrant toute l'étendue pratique de chaq
 
 Il est conçu comme un outil pratique destiné à la composition, à l'orchestration et à l'interprétation, permettant de comparer les timbres au-delà des différences de hauteur, d'instrument et de technique de jeu.
 
-![L1 Wasserstein distance matrix](../distanceMatrix_L1/distance_matrix_selected_heatmap.png)
+![L1 Wasserstein distance matrix](../colormap_L1/distance_matrix_selected_heatmap.png)
 
 ## ✨ Caractéristiques
 
-- **24 catégories d'instruments** (bois, cuivres, cordes, signaux de référence, etc. ; extension continue)
+- **31 catégories d'instruments** (bois, cuivres, cordes, signaux de référence, etc. ; extension continue)
 
-- **1 141 enregistrements WAV** (sons tenus chromatiques ; extension continue)
+- **1 484 enregistrements WAV** (sons tenus chromatiques ; extension continue)
 
   - Fréquence d'échantillonnage : $f_s=96\ \mathrm{kHz}$
 
