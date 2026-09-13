@@ -3,7 +3,7 @@
 # Development
 # ==========================================
 
-.old_py/
+.old_*/
 
 # Python
 __pycache__/

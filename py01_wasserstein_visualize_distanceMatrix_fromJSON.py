@@ -22,7 +22,7 @@ GROUP_JSON = (
     "display_groups.json"
 )
 
-OUT_DIR = "./distanceMatrix_L1"
+OUT_DIR = "./colormap_L1"
 
 
 # ==================================================

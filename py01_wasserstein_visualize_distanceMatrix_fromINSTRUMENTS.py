@@ -15,7 +15,7 @@ DISTANCE_MATRIX = (
     "distance_matrix_raw.csv"
 )
 
-OUT_DIR = "./distanceMatrix_L1"
+OUT_DIR = "./colormap_L1"
 
 
 # ==================================================
@@ -46,13 +46,22 @@ DISPLAY_GROUPS = [
     "cl-inA",
     "basscl",
     "fg",
+    "fh_tube-B",
+    "fh_tube-F",
     "basstrb",
     "basstrb_mute-straight",
     "basstrb_mute-straightMetal",
     "basstrb_mute-cup",
-    "basstrb_mute-harmonNOstem",
-    "basstrb_mute-harmonStemmed",
+    "basstrb_mute-harmonNOstemOPENED",
+    "basstrb_mute-harmonNOstemCLOSED",
+    "basstrb_mute-harmonStemmedOPENED",
+    "basstrb_mute-harmonStemmedCLOSED",
     "basstrb_mute-bucket",
+    "basstrb_tube-F",
+    "basstrb_tube-F_mute-straightMetal",
+    "basstrb_tube-F_mute-bucket",
+    "basstrb_tube-Ges",
+    "basstrb_tube-D",
     "va",
     # "gauss_sigma-002.5%"
 ]
