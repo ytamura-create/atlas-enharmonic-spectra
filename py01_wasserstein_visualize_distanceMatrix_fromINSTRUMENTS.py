@@ -46,8 +46,8 @@ DISPLAY_GROUPS = [
     "cl-inA",
     "basscl",
     "fg",
-    "fh_tube-B",
     "fh_tube-F",
+    "fh_tube-B",
     "basstrb",
     "basstrb_mute-straight",
     "basstrb_mute-straightMetal",
@@ -63,6 +63,12 @@ DISPLAY_GROUPS = [
     "basstrb_tube-Ges",
     "basstrb_tube-D",
     "va",
+    "gauss_sigma-002.5%",
+    "gauss_FWHM-wholetone",
+    "gauss_FWHM-halftone",
+    "gauss_FWHM-quartertone",
+    "gauss_FWHM-eighthtone",
+    "gauss_FWHM-sixteenthtone",
     # "gauss_sigma-002.5%"
 ]
 

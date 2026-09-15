@@ -28,9 +28,9 @@ Es dient als praktisches Hilfsmittel für Komposition, Instrumentation, Aufführ
 
 ## ✨ Merkmale
 
-- **31 Instrumentenkategorien** (Holzbläser, Blechbläser, Streicher, Referenzsignale u.a.; fortlaufend erweitert)
+- **36 Instrumentenkategorien** (Holzbläser, Blechbläser, Streicher, Referenzsignale u.a.; fortlaufend erweitert)
 
-- **1.484 WAV-Aufnahmen** (chromatische Langtöne; fortlaufend erweitert)
+- **1.969 WAV-Aufnahmen** (chromatische Langtöne; fortlaufend erweitert)
 
   - Abtastrate: $f_s=96\ \mathrm{kHz}$
 
