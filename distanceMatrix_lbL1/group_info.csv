@@ -30,3 +30,8 @@ group_index,group_name,size,start,end
 28,basstrb_tube-D,39,1308,1346
 29,va,40,1347,1386
 30,gauss_sigma-002.5%,97,1387,1483
+31,gauss_FWHM-wholetone,97,1484,1580
+32,gauss_FWHM-halftone,97,1581,1677
+33,gauss_FWHM-quartertone,97,1678,1774
+34,gauss_FWHM-eighthtone,97,1775,1871
+35,gauss_FWHM-sixteenthtone,97,1872,1968

@@ -51,14 +51,19 @@ TARGET_DIRS = [
     "basstrb_tube-Ges",
     "basstrb_tube-D",
     "va",
-    "gauss_sigma-002.5%"
+    "gauss_sigma-002.5%",
+    "gauss_FWHM-wholetone",
+    "gauss_FWHM-halftone",
+    "gauss_FWHM-quartertone",
+    "gauss_FWHM-eighthtone",
+    "gauss_FWHM-sixteenthtone",
 ]
 
 KEYWORD = ""
 
 NORMALIZE_DISTANCE_MATRIX = False
 
-REBUILD_CACHE = True
+REBUILD_CACHE = False
 
 DISPLAY_GROUPS_JSON = os.path.join(
     OUT_DIR,
