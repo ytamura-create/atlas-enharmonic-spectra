@@ -16,7 +16,7 @@ ROOT_DIR = os.path.expanduser("./wav/")
 
 TARGET_SR = 96000
 
-WASSERSTEIN_MODE = "L1"
+WASSERSTEIN_MODE = "lbL1"
 
 OUT_DIR = f"./distanceMatrix_{WASSERSTEIN_MODE}"
 
