@@ -137,7 +137,7 @@ cdf_Q = np.cumsum(spectrum_Q)
 
 berechnet, und die $L^1$-Wasserstein-Distanz ($p=1$) zwischen den diskreten Datenfolgen wird als
 
-$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\ \Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df

@@ -143,7 +143,7 @@ cdf_Q = np.cumsum(spectrum_Q)
 
 а расстояние Вассерштейна $L^1$ ($p=1$) между дискретными рядами данных рассчитывается по формуле
 
-$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\ \Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df

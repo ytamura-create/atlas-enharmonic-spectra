@@ -145,7 +145,7 @@ cdf_Q = np.cumsum(spectrum_Q)
 
 として計算し、離散データ列による $L^1$-Wasserstein 距離（$p=1$）を
 
-$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\ \Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df

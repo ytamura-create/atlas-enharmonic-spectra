@@ -138,7 +138,7 @@ cdf_Q = np.cumsum(spectrum_Q)
 
 and the $L^1$-Wasserstein distance ($p=1$) between the discrete data sequences is calculated as
 
-$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\ \Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df

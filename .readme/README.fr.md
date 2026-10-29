@@ -147,7 +147,7 @@ cdf_Q = np.cumsum(spectrum_Q)
 
 et la distance de Wasserstein $L^1$ ($p=1$) entre les suites de données discrètes est calculée par
 
-$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\ \Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df
