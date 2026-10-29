@@ -2,5 +2,5 @@ distanceMatrix_L1/distance_matrix_raw.csv filter=lfs diff=lfs merge=lfs -text
 distanceMatrix_L2/distance_matrix_raw.csv filter=lfs diff=lfs merge=lfs -text
 distanceMatrix_lbL1_f0-20Hz/distance_matrix_raw.csv filter=lfs diff=lfs merge=lfs -text
 distanceMatrix_lbL2_f0-20Hz/distance_matrix_raw.csv filter=lfs diff=lfs merge=lfs -text
-distanceMatrix_*/distance_matrix_raw.csv filter=lfs diff=lfs merge=lfs -text
 distanceMatrix_lbL2/distance_matrix_raw.csv filter=lfs diff=lfs merge=lfs -text
+distanceMatrix_*/distance_matrix_raw.csv filter=lfs diff=lfs merge=lfs -text
