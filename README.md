@@ -1,4 +1,4 @@
-Language: English | [日本語](.readme/README.ja.md) | [Français](.readme/README.fr.md) | [Deutsch](.readme/README.de.md) | [Italiano](.readme/README.it.md) | [Русский](.readme/README.ru.md) |
+Language: **English** | [日本語](.readme/README.ja.md) | [Français](.readme/README.fr.md) | [Deutsch](.readme/README.de.md) | [Italiano](.readme/README.it.md) | [Русский](.readme/README.ru.md) |
 
 > *Melodies of timbre!* What refined senses are able to distinguish these differences! What highly cultivated mind can find delight in such subtle nuances of sound!
 >
