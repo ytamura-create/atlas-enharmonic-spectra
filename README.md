@@ -1,4 +1,4 @@
-Language: English | [日本語](.readme/README.ja.md) | [Français](.readme/README.fr.md) | [Deutsch](.readme/README.de.md)
+Language: English | [日本語](.readme/README.ja.md) | [Français](.readme/README.fr.md) | [Deutsch](.readme/README.de.md) | [Italiano](.readme/README.it.md) | [Русский](.readme/README.ru.md) |
 
 > *Melodies of timbre!* What refined senses are able to distinguish these differences! What highly cultivated mind can find delight in such subtle nuances of sound!
 >
@@ -115,50 +115,40 @@ The analysis relies exclusively on **physical observables** up to the point imme
 
 In recent years, **Wasserstein geometry** has become widely established in information geometry, statistics, and machine learning as a framework that endows probability distributions with geometric structure through optimal transport. The work of **Shun-ichi Amari** and collaborators has been particularly influential in revealing new connections between optimal transport and information geometry. Here this framework is applied to timbre, describing timbral change as **the minimum transport cost required to move spectral mass from one normalized spectral distribution to another**.
 
-Although the repository also includes L2-Wasserstein distances and logarithmic-frequency variants, the accompanying research consistently adopts the **L1-Wasserstein distance**, since it preserves spectral mass while expressing transport along the frequency axis directly as a distance.
+For one-dimensional probability distributions $P,Q$, the $p$-Wasserstein distance ($p\ge 1$) can be written using the generalized inverses (quantile functions) ${F_P}^{-1},{F_Q}^{-1}$ of the cumulative distribution functions $F_P,F_Q$ as
 
-For one-dimensional probability distributions $P$ and $Q$, the L1-Wasserstein distance is defined by
+$$\mathcal W_p(P,Q)=\left(\int_{0}^{1}\Bigl\lvert F_P^{-1}(u)-F_Q^{-1}(u)\Bigr\rvert^p\ \mathrm du\right)^{1/p}.$$
 
-$$
-W_1(P,Q)=\int_{-\infty}^{\infty}\Bigl\lvert F_P(x)-F_Q(x)\Bigr\rvert\ \mathrm dx,
-$$
+In particular, for $p=1$ it is computed from the difference of the cumulative distribution functions:
 
-where $F_P$ and $F_Q$ are the cumulative distribution functions
+$$\mathcal W_1(P,Q)=\int_{-\infty}^{\infty}\Bigl\lvert F_P(x)-F_Q(x)\Bigr\rvert\ \mathrm dx.$$
 
-$$
-F_P(x)=\int_{-\infty}^{x}P(y)\ \mathrm dy,\qquad
-F_Q(x)=\int_{-\infty}^{x}Q(y)\ \mathrm dy.
-$$
+Here $F_P,F_Q$ are the cumulative distribution functions of the normalized spectra $P,Q$, respectively:
 
-Because **Atlas Enharmonic Spectra** operates on DISCRETE FFT spectra, these cumulative distributions are computed as
+$$F_P(x) = \int_{-\infty}^x P(y)\ \mathrm dy,\qquad F_Q(x) = \int_{-\infty}^x Q(y)\ \mathrm dy.$$
 
-$$
-F_P[i]=\sum_{j=0}^{i}P[j],\qquad
-F_Q[i]=\sum_{j=0}^{i}Q[j].
-$$
+**Atlas Enharmonic Spectra** deals with discrete spectra obtained by FFT, so the cumulative distributions are computed as
+
+$$F_P[i]=\sum_{j=0}^{i}{P[j]},\qquad F_Q[i]=\sum_{j=0}^{i}{Q[j]}$$
 
 ```python
 cdf_P = np.cumsum(spectrum_P)
 cdf_Q = np.cumsum(spectrum_Q)
 ```
 
-The discrete L1-Wasserstein distance is then calculated as
+and the $L^1$-Wasserstein distance ($p=1$) between the discrete data sequences is calculated as
 
-$$
-W_1(P,Q)=\sum_i\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\Delta f,
-$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df
 ```
 
-where
+where $\Delta f$ (`df`) is the frequency resolution of the FFT:
 
 $$
-\Delta f=\frac{f_s}{N}\approx0.092\ \mathrm{Hz}
+\Delta f = \frac{f_{\text s}}{N} \approx 0.092\ \mathrm{Hz}.
 $$
-
-is the FFT frequency resolution.
 
 This formulation preserves spectral probability while measuring how much spectral mass must be moved, and over what distance. Timbral differences are therefore represented not as isolated peak differences but as the minimum work (cost) required to rearrange the entire spectral distribution.
 

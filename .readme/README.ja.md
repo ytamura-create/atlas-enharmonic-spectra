@@ -1,4 +1,4 @@
-言語: | [English](../README.md) | 日本語 | [Français](README.fr.md) | [Deutsch](README.de.md)
+言語: | [English](../README.md) | 日本語 | [Français](README.fr.md) | [Deutsch](README.de.md) | [Italiano](.readme/README.it.md) | [Русский](.readme/README.ru.md) |
 
 > Klangfarbenmelodien! Welche feinen Sinne, die hier unterscheiden, welcher hochentwickelte Geist, der an so subtilen Dingen Vergnügen finden mag!
 >
@@ -120,30 +120,32 @@ Arnold Schönberg は *Harmonielehre*（1911）の中で、
 
 近年、**Wasserstein 幾何** は、確率分布に最適輸送による幾何学構造を与える枠組みとして、情報幾何学・統計学・機械学習で広く用いられている。特に **甘利俊一** らの研究は、最適輸送と情報幾何学の接点を切り開き、確率分布を幾何学的に扱う新たな視点を示した。本リポジトリはこの枠組みを音色解析へ応用し、音色変化を「一つのスペクトル分布から別の分布へスペクトル質量を移すために必要な最小輸送コスト」として記述する。
 
-本リポジトリには L2-Wasserstein 距離や対数周波数版も含まれているが、研究では一貫して **L1-Wasserstein 距離** を採用している。これは、スペクトル質量を保存したまま、周波数軸上での輸送をそのまま距離として表現できるためである。
+一次元の確率分布 $P,Q$ に対する $p$-Wasserstein 距離（$p\ge 1$）は、累積分布関数 $F_P,F_Q$ の一般化逆関数（分位関数）${F_P}^{-1},{F_Q}^{-1}$ を用いて
 
-一次元の確率分布 $P,Q$ に対する L1-Wasserstein 距離は、
+$$\mathcal W_p(P,Q)=\left(\int_{0}^{1}\Bigl\lvert F_P^{-1}(u)-F_Q^{-1}(u)\Bigr\rvert^p\ \mathrm du\right)^{1/p}$$
 
-$$W_1(P,Q)=\int_{-\infty}^{\infty}\Bigl\lvert F_P(x)-F_Q(x)\Bigr\rvert\ \mathrm dx$$
+と書ける。特に $p=1$ のとき、累積分布関数の差を用いて
 
-で定義される。ここで $F_P,F_Q$ は、それぞれ正規化スペクトル $P,Q$ の累積分布関数
+$$\mathcal W_1(P,Q)=\int_{-\infty}^{\infty}\Bigl\lvert F_P(x)-F_Q(x)\Bigr\rvert\ \mathrm dx$$
+
+で計算される。ここで $F_P,F_Q$ は、それぞれ正規化スペクトル $P,Q$ の累積分布関数
 
 $$F_P(x) = \int_{-\infty}^x P(y)\ \mathrm dy,\qquad F_Q(x) = \int_{-\infty}^x Q(y)\ \mathrm dy$$
 
 である。
 
-**Atlas Enharmonic Spectra** では FFT によって得られる 離散 スペクトルを扱うため、累積分布を
+**Atlas Enharmonic Spectra** では FFT によって得られる離散スペクトルを扱うため、累積分布を
 
-$$F_P[i]=\sum_{j=0}^{i}P[j],\qquad F_Q[i]=\sum_{j=0}^{i}Q[j]$$
+$$F_P[i]=\sum_{j=0}^{i}{P[j]},\qquad F_Q[i]=\sum_{j=0}^{i}{Q[j]}$$
 
 ```python
 cdf_P = np.cumsum(spectrum_P)
 cdf_Q = np.cumsum(spectrum_Q)
 ```
 
-として計算し、離散データ列による L1-Wasserstein 距離を
+として計算し、離散データ列による $L^1$-Wasserstein 距離（$p=1$）を
 
-$$W_1(P,Q)=\sum_i\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\Delta f$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df
@@ -153,7 +155,7 @@ return np.sum(np.abs(cdf_P - cdf_Q)) * df
 $\Delta f$（`df`）は FFT の周波数分解能
 
 $$
-\Delta f = \frac{f_s}{N} \approx 0.092\ \mathrm{Hz}
+\Delta f = \frac{f_{\text s}}{N} \approx 0.092\ \mathrm{Hz}
 $$
 
 である。
@@ -170,7 +172,7 @@ $$
 
 ```bibtex
 @misc{tamura2026klangfarbenakkord,
-  title={Klangfarbenakkord and Klangfarbenharmonien Metric Space Models for Music on Informational Geometry 1},
+  title={Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1},
   author={Yusei Tamura and Shigekazu Ishihara and Ken Ito},
   year={2026},
   eprint={2608.28026},

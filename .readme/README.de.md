@@ -1,4 +1,4 @@
-Language: [English](../README.md) | [日本語](README.ja.md) | [Français](README.fr.md) | Deutsch
+Sprachen: [English](../README.md) | [日本語](README.ja.md) | [Français](README.fr.md) | Deutsch | [Italiano](.readme/README.it.md) | [Русский](.readme/README.ru.md) |
 
 > **Klangfarbenmelodien!** Welche feinen Sinne, die hier unterscheiden, welcher hochentwickelte Geist, der an so subtilen Dingen Vergnügen finden mag!
 >
@@ -114,50 +114,40 @@ Die Analyse stützt sich ausschließlich auf **physikalisch beobachtbare Größe
 
 In den vergangenen Jahren hat sich die **Wasserstein-Geometrie** als Rahmen etabliert, der Wahrscheinlichkeitsverteilungen durch optimalen Transport eine geometrische Struktur verleiht. Die Arbeiten von **Shun-ichi Amari** und seinen Mitarbeitern haben insbesondere neue Verbindungen zwischen optimalem Transport und Informationsgeometrie aufgezeigt. In diesem Repository wird dieser Rahmen auf die Klangfarbenanalyse übertragen, wobei Klangfarbenänderungen als **minimaler Transportaufwand zum Verschieben spektraler Masse von einer normalisierten Spektralverteilung in eine andere** beschrieben werden.
 
-Obwohl das Repository auch L2-Wasserstein-Distanzen und logarithmische Frequenzvarianten enthält, verwendet die zugehörige Forschung konsequent die **L1-Wasserstein-Distanz**, da sie die spektrale Masse erhält und den Transport entlang der Frequenzachse unmittelbar als Distanz ausdrückt.
+Für eindimensionale Wahrscheinlichkeitsverteilungen $P,Q$ lässt sich die $p$-Wasserstein-Distanz ($p\ge 1$) mithilfe der verallgemeinerten Inversen (Quantilfunktionen) ${F_P}^{-1},{F_Q}^{-1}$ der Verteilungsfunktionen $F_P,F_Q$ schreiben als
 
-Für eindimensionale Wahrscheinlichkeitsverteilungen $P$ und $Q$ ist die L1-Wasserstein-Distanz definiert durch
+$$\mathcal W_p(P,Q)=\left(\int_{0}^{1}\Bigl\lvert F_P^{-1}(u)-F_Q^{-1}(u)\Bigr\rvert^p\ \mathrm du\right)^{1/p}.$$
 
-$$
-W_1(P,Q)=\int_{-\infty}^{\infty}\Bigl\lvert F_P(x)-F_Q(x)\Bigr\rvert\ \mathrm dx,
-$$
+Insbesondere wird sie für $p=1$ aus der Differenz der Verteilungsfunktionen berechnet:
 
-wobei $F_P$ und $F_Q$ die kumulativen Verteilungsfunktionen sind:
+$$\mathcal W_1(P,Q)=\int_{-\infty}^{\infty}\Bigl\lvert F_P(x)-F_Q(x)\Bigr\rvert\ \mathrm dx.$$
 
-$$
-F_P(x)=\int_{-\infty}^{x}P(y)\ \mathrm dy,\qquad
-F_Q(x)=\int_{-\infty}^{x}Q(y)\ \mathrm dy.
-$$
+Dabei sind $F_P,F_Q$ die Verteilungsfunktionen der normierten Spektren $P$ bzw. $Q$:
 
-Da **Atlas Enharmonic Spectra** mit **diskreten FFT-Spektren** arbeitet, werden diese kumulativen Verteilungen berechnet als
+$$F_P(x) = \int_{-\infty}^x P(y)\ \mathrm dy,\qquad F_Q(x) = \int_{-\infty}^x Q(y)\ \mathrm dy.$$
 
-$$
-F_P[i]=\sum_{j=0}^{i}P[j],\qquad
-F_Q[i]=\sum_{j=0}^{i}Q[j].
-$$
+**Atlas Enharmonic Spectra** verarbeitet diskrete, per FFT gewonnene Spektren; daher werden die Verteilungsfunktionen als
+
+$$F_P[i]=\sum_{j=0}^{i}{P[j]},\qquad F_Q[i]=\sum_{j=0}^{i}{Q[j]}$$
 
 ```python
 cdf_P = np.cumsum(spectrum_P)
 cdf_Q = np.cumsum(spectrum_Q)
 ```
 
-Die diskrete L1-Wasserstein-Distanz ergibt sich anschließend zu
+berechnet, und die $L^1$-Wasserstein-Distanz ($p=1$) zwischen den diskreten Datenfolgen wird als
 
-$$
-W_1(P,Q)=\sum_i\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\Delta f,
-$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df
 ```
 
-wobei
+ermittelt. Dabei ist $\Delta f$ (`df`) die Frequenzauflösung der FFT:
 
 $$
-\Delta f=\frac{f_s}{N}\approx0.092\ \mathrm{Hz}
+\Delta f = \frac{f_{\text s}}{N} \approx 0.092\ \mathrm{Hz}.
 $$
-
-die Frequenzauflösung der FFT bezeichnet.
 
 Diese Formulierung erhält die spektrale Wahrscheinlichkeit und misst zugleich, wie viel spektrale Masse über welche Entfernung transportiert werden muss. Klangfarbenunterschiede erscheinen dadurch nicht als isolierte Peak-Differenzen, sondern als der minimale Arbeits- bzw. Kostenaufwand, der zur Umordnung der gesamten Spektralverteilung erforderlich ist.
 

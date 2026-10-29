@@ -1,4 +1,4 @@
-Language: | [English](../README.md) | [日本語](README.ja.md) | Français | [Deutsch](README.de.md)
+Langues: | [English](../README.md) | [日本語](README.ja.md) | Français | [Deutsch](README.de.md) | [Italiano](.readme/README.it.md) | [Русский](.readme/README.ru.md) |
 
 > *Klangfarbenmelodien! Welche feinen Sinne, die hier unterscheiden, welcher hochentwickelte Geist, der an so subtilen Dingen Vergnügen finden mag!*
 >
@@ -124,50 +124,40 @@ L'analyse repose exclusivement sur des **grandeurs physiquement observables**, j
 
 Ces dernières années, la **géométrie de Wasserstein** s'est imposée en géométrie de l'information, en statistique et en apprentissage automatique comme un cadre conférant une structure géométrique aux distributions de probabilité par le transport optimal. Les travaux de **Shun-ichi Amari** et de ses collaborateurs ont notamment joué un rôle majeur dans la mise en évidence de nouveaux liens entre transport optimal et géométrie de l'information. Ce dépôt applique ce cadre à l'analyse du timbre en décrivant les transformations de timbre comme **le coût minimal de transport nécessaire pour déplacer la masse spectrale d'une distribution spectrale normalisée vers une autre**.
 
-Bien que le dépôt comprenne également des distances de Wasserstein L2 et des variantes en fréquence logarithmique, les recherches associées adoptent systématiquement la **distance de Wasserstein L1**, car elle préserve la masse spectrale tout en exprimant directement le transport le long de l'axe des fréquences comme une distance.
+Pour des distributions de probabilité unidimensionnelles $P,Q$, la distance de Wasserstein d'ordre $p$ ($p\ge 1$) s'écrit, à l'aide des inverses généralisées (fonctions quantiles) ${F_P}^{-1},{F_Q}^{-1}$ des fonctions de répartition $F_P,F_Q$, sous la forme
 
-Pour des distributions de probabilité unidimensionnelles $P$ et $Q$, la distance de Wasserstein L1 est définie par
+$$\mathcal W_p(P,Q)=\left(\int_{0}^{1}\Bigl\lvert F_P^{-1}(u)-F_Q^{-1}(u)\Bigr\rvert^p\ \mathrm du\right)^{1/p}.$$
 
-$$
-W_1(P,Q)=\int_{-\infty}^{\infty}\Bigl\lvert F_P(x)-F_Q(x)\Bigr\rvert\ \mathrm dx,
-$$
+En particulier, pour $p=1$, elle se calcule à partir de la différence des fonctions de répartition :
 
-où $F_P$ et $F_Q$ sont les fonctions de répartition
+$$\mathcal W_1(P,Q)=\int_{-\infty}^{\infty}\Bigl\lvert F_P(x)-F_Q(x)\Bigr\rvert\ \mathrm dx.$$
 
-$$
-F_P(x)=\int_{-\infty}^{x}P(y)\ \mathrm dy,\qquad
-F_Q(x)=\int_{-\infty}^{x}Q(y)\ \mathrm dy.
-$$
+Ici, $F_P,F_Q$ sont respectivement les fonctions de répartition des spectres normalisés $P,Q$ :
 
-Comme **Atlas Enharmonic Spectra** travaille sur des spectres FFT discrets, ces distributions cumulées sont calculées comme
+$$F_P(x) = \int_{-\infty}^x P(y)\ \mathrm dy,\qquad F_Q(x) = \int_{-\infty}^x Q(y)\ \mathrm dy.$$
 
-$$
-F_P[i]=\sum_{j=0}^{i}P[j],\qquad
-F_Q[i]=\sum_{j=0}^{i}Q[j].
-$$
+**Atlas Enharmonic Spectra** traite des spectres discrets obtenus par FFT ; les fonctions de répartition sont donc calculées par
+
+$$F_P[i]=\sum_{j=0}^{i}{P[j]},\qquad F_Q[i]=\sum_{j=0}^{i}{Q[j]}$$
 
 ```python
 cdf_P = np.cumsum(spectrum_P)
 cdf_Q = np.cumsum(spectrum_Q)
 ```
 
-La distance discrète de Wasserstein L1 est ensuite calculée par
+et la distance de Wasserstein $L^1$ ($p=1$) entre les suites de données discrètes est calculée par
 
-$$
-W_1(P,Q)=\sum_i\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\Delta f,
-$$
+$$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\,\Delta f}$$
 
 ```python
 return np.sum(np.abs(cdf_P - cdf_Q)) * df
 ```
 
-où
+où $\Delta f$ (`df`) est la résolution fréquentielle de la FFT :
 
 $$
-\Delta f=\frac{f_s}{N}\approx0.092\ \mathrm{Hz}
+\Delta f = \frac{f_{\text s}}{N} \approx 0.092\ \mathrm{Hz}.
 $$
-
-est la résolution fréquentielle de la FFT.
 
 Cette formulation préserve la probabilité spectrale tout en mesurant la quantité de masse spectrale à déplacer et la distance sur laquelle elle doit être transportée. Les différences de timbre sont ainsi représentées non comme des écarts entre pics isolés, mais comme le travail minimal nécessaire pour réorganiser l'ensemble de la distribution spectrale.
 
