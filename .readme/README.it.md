@@ -38,9 +38,9 @@ Oltre a registrazioni standardizzate che coprono l'intera estensione pratica dei
 
 - **43 categorie di strumenti** (legni, ottoni, archi, segnali di riferimento e altro; il dataset verrà ampliato progressivamente).
 - **2655 registrazioni WAV** di note lunghe cromatiche (il dataset verrà ampliato progressivamente).
-  - Frequenza di campionamento: \(f_s=96\ \mathrm{kHz}\).
-  - Numero di campioni: \(N=2^{20}\).
-  - Di conseguenza, la durata dei dati è uniformata a \(N/f_s=10.922666\ldots\ \mathrm{sec}\).
+  - Frequenza di campionamento: $f_s=96\ \mathrm{kHz}$.
+  - Numero di campioni: $N=2^{20}$.
+  - Di conseguenza, la durata dei dati è uniformata a $N/f_s=10.922666\ldots\ \mathrm{sec}$.
   - Si veda [*Sparse FFT: nuova analisi in frequenza ad alta risoluzione e sue applicazioni*](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/).
 - Convenzione uniforme di denominazione dei file, comprendente altezza scritta, altezza reale e condizioni esecutive.
 - Script per il calcolo delle distanze di Wasserstein L1 e L2 tra spettri.
@@ -96,9 +96,13 @@ Eseguire i programmi Python seguendo il diagramma di flusso riportato di seguito
 
 Nella sua *Harmonielehre* (1911), Arnold Schönberg scrisse che sarebbe stato possibile:
 
-> *«...produrre successioni le cui relazioni reciproche agissero secondo una sorta di logica, del tutto equivalente a quella che ci basta nella melodia delle altezze sonore.»*
+> *„...solche **Folgen** herzustellen, deren Beziehung untereinander mit einer Art Logik wirkt, ganz äquivalent jener Logik, die uns bei der Melodie der Klanghöhen genügt.“*
+
+> *«...produrre **successioni** le cui relazioni reciproche agissero secondo una sorta di logica, del tutto equivalente a quella che ci basta nella melodia delle altezze sonore.»*
 
 Allo stesso tempo, riconosceva che tale possibilità apparteneva ancora al futuro:
+
+> *„Das scheint eine Zukunftsphantasie und ist es wahrscheinlich auch. Aber eine, von der ich fest glaube, daß sie sich verwirklichen wird.“*
 
 > *«Ciò sembra una fantasia del futuro, e probabilmente lo è. Ma è una fantasia nella cui realizzazione credo fermamente.»*
 
