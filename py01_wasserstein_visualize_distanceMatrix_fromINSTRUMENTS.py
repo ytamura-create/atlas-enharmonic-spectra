@@ -10,7 +10,8 @@ import seaborn as sns
 # 設定
 # ==================================================
 
-WASSERSTEIN_MODE = "lbL2_f0-20Hz"
+WASSERSTEIN_MODE = "L1"
+# WASSERSTEIN_MODE = "lbL2_f0-20Hz"
 
 DISTANCE_MATRIX = (
     f"./distanceMatrix_{WASSERSTEIN_MODE}/"
