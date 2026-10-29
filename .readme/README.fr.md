@@ -1,4 +1,4 @@
-Langues: | [English](../README.md) | [日本語](README.ja.md) | **Français** | [Deutsch](README.de.md) | [Italiano](.readme/README.it.md) | [Русский](README.ru.md) |
+Langues: | [English](../README.md) | [日本語](README.ja.md) | **Français** | [Deutsch](README.de.md) | [Italiano](README.it.md) | [Русский](README.ru.md) |
 
 > *Klangfarbenmelodien! Welche feinen Sinne, die hier unterscheiden, welcher hochentwickelte Geist, der an so subtilen Dingen Vergnügen finden mag!*
 >
