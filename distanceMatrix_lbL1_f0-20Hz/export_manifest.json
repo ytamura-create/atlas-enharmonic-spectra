@@ -1,0 +1,18 @@
+{
+  "complete": true,
+  "finished_at": "2026-10-29T04:20:13",
+  "n_files": 2655,
+  "spectrum_bins": 524289,
+  "wasserstein_mode": "lbL1",
+  "fingerprint": {
+    "code_version": 3,
+    "target_sr": 96000,
+    "order": 1,
+    "log_axis": true,
+    "spectrum_len": 524289,
+    "log_f0_hz": 20.0,
+    "log_k0": 219
+  },
+  "files_digest": "2242fb4efb374ef8490373793afe305110cbf02e1a7e75bc85e05934ed004860",
+  "spectra_npy_exported": true
+}

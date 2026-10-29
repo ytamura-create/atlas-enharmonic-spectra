@@ -34,9 +34,9 @@ Il est conçu comme un outil pratique destiné à la composition, à l'orchestra
 
 ## ✨ Caractéristiques
 
-- **41 catégories d'instruments** (bois, cuivres, cordes, signaux de référence, etc. ; extension continue)
+- **43 catégories d'instruments** (bois, cuivres, cordes, signaux de référence, etc. ; extension continue)
 
-- **2 445 enregistrements WAV** (sons tenus chromatiques ; extension continue)
+- **2 655 enregistrements WAV** (sons tenus chromatiques ; extension continue)
 
   - Fréquence d'échantillonnage : $f_s=96\ \mathrm{kHz}$
 

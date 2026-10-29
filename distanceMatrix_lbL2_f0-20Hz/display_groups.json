@@ -1,0 +1,174 @@
+[
+  {
+    "group_name": "picc",
+    "group_index": 0
+  },
+  {
+    "group_name": "fl",
+    "group_index": 1
+  },
+  {
+    "group_name": "fl_lip-tight",
+    "group_index": 2
+  },
+  {
+    "group_name": "altofl",
+    "group_index": 3
+  },
+  {
+    "group_name": "bassfl",
+    "group_index": 4
+  },
+  {
+    "group_name": "kbfl",
+    "group_index": 5
+  },
+  {
+    "group_name": "ob",
+    "group_index": 6
+  },
+  {
+    "group_name": "ci",
+    "group_index": 7
+  },
+  {
+    "group_name": "cl-inEs",
+    "group_index": 8
+  },
+  {
+    "group_name": "cl-inB",
+    "group_index": 9
+  },
+  {
+    "group_name": "cl-inA",
+    "group_index": 10
+  },
+  {
+    "group_name": "basscl",
+    "group_index": 11
+  },
+  {
+    "group_name": "fg",
+    "group_index": 12
+  },
+  {
+    "group_name": "fh_tube-F",
+    "group_index": 13
+  },
+  {
+    "group_name": "fh_tube-B",
+    "group_index": 14
+  },
+  {
+    "group_name": "fh_bell-cuivre_tube-F",
+    "group_index": 15
+  },
+  {
+    "group_name": "fh_bell-straightMute_tube-F",
+    "group_index": 16
+  },
+  {
+    "group_name": "fh_bell-gestopftMute_tube-F",
+    "group_index": 17
+  },
+  {
+    "group_name": "tenortrb",
+    "group_index": 18
+  },
+  {
+    "group_name": "tenortrb_mute-straight",
+    "group_index": 19
+  },
+  {
+    "group_name": "basstrb",
+    "group_index": 20
+  },
+  {
+    "group_name": "basstrb_mute-straight",
+    "group_index": 21
+  },
+  {
+    "group_name": "basstrb_mute-straightMetal",
+    "group_index": 22
+  },
+  {
+    "group_name": "basstrb_mute-cup",
+    "group_index": 23
+  },
+  {
+    "group_name": "basstrb_mute-harmonNOstemOPENED",
+    "group_index": 24
+  },
+  {
+    "group_name": "basstrb_mute-harmonNOstemCLOSED",
+    "group_index": 25
+  },
+  {
+    "group_name": "basstrb_mute-harmonStemmedOPENED",
+    "group_index": 26
+  },
+  {
+    "group_name": "basstrb_mute-harmonStemmedCLOSED",
+    "group_index": 27
+  },
+  {
+    "group_name": "basstrb_mute-bucket",
+    "group_index": 28
+  },
+  {
+    "group_name": "basstrb_tube-F",
+    "group_index": 29
+  },
+  {
+    "group_name": "basstrb_tube-F_mute-harmonNOstemOPENED",
+    "group_index": 30
+  },
+  {
+    "group_name": "basstrb_tube-F_mute-harmonNOstemCLOSED",
+    "group_index": 31
+  },
+  {
+    "group_name": "basstrb_tube-F_mute-straightMetal",
+    "group_index": 32
+  },
+  {
+    "group_name": "basstrb_tube-F_mute-bucket",
+    "group_index": 33
+  },
+  {
+    "group_name": "basstrb_tube-Ges",
+    "group_index": 34
+  },
+  {
+    "group_name": "basstrb_tube-D",
+    "group_index": 35
+  },
+  {
+    "group_name": "va",
+    "group_index": 36
+  },
+  {
+    "group_name": "gauss_sigma-002.5%",
+    "group_index": 37
+  },
+  {
+    "group_name": "gauss_FWHM-wholetone",
+    "group_index": 38
+  },
+  {
+    "group_name": "gauss_FWHM-halftone",
+    "group_index": 39
+  },
+  {
+    "group_name": "gauss_FWHM-quartertone",
+    "group_index": 40
+  },
+  {
+    "group_name": "gauss_FWHM-eighthtone",
+    "group_index": 41
+  },
+  {
+    "group_name": "gauss_FWHM-sixteenthtone",
+    "group_index": 42
+  }
+]

@@ -1,11 +1,51 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+wav群 -> スペクトル分布 -> 1次元Wasserstein距離行列(CDF積分方式)
+
+【この版の設計方針】 クラッシュしても「間違った結果が静かに混ざる」ことを構造的に無くす
+
+旧版の問題:
+  * spectra.npy / file_info.csv / sha256_cache.json / distance_matrix_raw.* を
+    別々の時刻に書いていたため、クラッシュ後は「互いに食い違った世代」が残った。
+  * spectra.npy は毎回ゼロ埋めで作り直しており、書き込み途中で落ちると
+    「行数だけ合っていて後半がゼロ」のファイルが有効なキャッシュとして採用された。
+  * 距離キャッシュの有効性を、すでに今回の値で上書き済みのsha256_cache.jsonと
+    比較していたため、検証が実質的に常に通った。
+  * 距離計算の途中経過は保存されず、落ちるたびに全ペアをやり直しになった。
+
+この版:
+  1. スペクトルは「wavのSHA256をファイル名にした1ファイル1スペクトル」で保存する。
+     (内容アドレス方式。位置(行番号)に依存しないので、ファイルを足す/消す/並べ替えても
+      古い行を取り違えようがない。ファイル数が増えても新規分だけ計算する。)
+  2. 距離のキャッシュは distance_state.npz 1ファイルだけ。
+     中身 = (各行のSHA256, 距離行列D, 各要素が計算済みかのvalidマスク, 計算条件)。
+     行列と「それが何の内容に対する値か」が同じファイルに入っているので食い違わない。
+     計算途中でも定期的に保存するので、落ちても続きから再開できる。
+  3. 書き込みは全て 一時ファイル -> fsync -> os.replace(原子的置換)。
+     途中で落ちても「完成した旧版」か「完成した新版」のどちらかしか存在しない。
+  4. distance_matrix_raw.npy/csv, file_info.csv, spectra.npy 等は「出力(エクスポート)」であり、
+     次回実行でキャッシュとして読み戻すことは一切ない。壊れていても結果を汚染しない。
+  5. 読み込むスペクトルは長さとCDF終端(≈1)を毎回検査し、ゼロ行などの破損を検出する。
+  6. 最後に、ランダムに選んだファイルをwavから計算し直して、行列の値と突き合わせる(自己検証)。
+
+REBUILD_CACHE:
+  True  : このスクリプトのキャッシュ(スペクトルキャッシュ・distance_state.npz)を削除して全部作り直す。
+          途中で落ちた場合は False に戻して再実行すると、作成済みの分から再開できる。
+  False : 内容(SHA256)が同じものは再利用、新規/変更分だけ計算する。
+"""
+
 import os
-import json
+import sys
 import csv
+import json
+import time
 import hashlib
+import datetime
 
 import numpy as np
-import pandas as pd
 import librosa
+from scipy.spatial.distance import cdist
 
 
 # ==================================================
@@ -16,9 +56,23 @@ ROOT_DIR = os.path.expanduser("./wav/")
 
 TARGET_SR = 96000
 
-WASSERSTEIN_MODE = "lbL1"
+WASSERSTEIN_MODE = "L1"
 
-OUT_DIR = f"./distanceMatrix_{WASSERSTEIN_MODE}"
+# 対数軸モード("lbL1" / "lbL2")の軸は x = lb(f / f0)。
+#
+# f0 は各ビンの重みには影響しない(刻み幅 dx = lb((k+1)/k) で f0 は消える)。
+# f0 が決めるのは「下限カットオフ」だけ: f0 未満のビン(DC含む)は捨て、
+# 残りのスペクトルを総和1に再正規化してから距離を計算する。
+# 目安: 全楽器の最低基音(バストロンボーンのペダル音 B♭0 ≈ 29 Hz)より少し下 -> 20 Hz。
+LOG_F0_HZ = 20.0
+
+OUT_DIR = (
+    f"./distanceMatrix_{WASSERSTEIN_MODE}"
+    + (f"_f0-{LOG_F0_HZ:g}Hz" if WASSERSTEIN_MODE.lower().startswith("lb") else "")
+)
+
+# スペクトルキャッシュの置き場。モード(L1/L2…)が違っても共通で使える。
+SPECTRA_CACHE_ROOT = "./spectra_cache"
 
 TARGET_DIRS = [
     "picc",
@@ -36,6 +90,9 @@ TARGET_DIRS = [
     "fg",
     "fh_tube-F",
     "fh_tube-B",
+    "fh_bell-cuivre_tube-F",
+    "fh_bell-straightMute_tube-F",
+    "fh_bell-gestopftMute_tube-F",
     "tenortrb",
     "tenortrb_mute-straight",
     "basstrb",
@@ -63,123 +120,208 @@ TARGET_DIRS = [
     "gauss_FWHM-sixteenthtone",
 ]
 
+# ファイル名にこの文字列を含むものだけを対象にする("" なら全部)。
+# 注意: 絞り込むと、絞り込み外のファイルの距離キャッシュは次回保存時に捨てられる。
 KEYWORD = ""
 
 NORMALIZE_DISTANCE_MATRIX = False
 
 REBUILD_CACHE = False
 
-DISPLAY_GROUPS_JSON = os.path.join(
-    OUT_DIR,
-    "display_groups.json"
-)
+# 旧版互換の spectra.npy(N x L, float32, 約4GB) を出力するか。
+# このスクリプト自身は読まない(下流の解析・描画用)。不要なら False で数分と4GB書き込みを節約。
+EXPORT_SPECTRA_NPY = True
+
+# 計算が終わった後、キャッシュ(不要になった古いスペクトル)を削除するか。
+PRUNE_UNUSED_SPECTRA = False
 
 
 # ==================================================
-# RAM対策設定
+# 計算量・メモリ設定
 # ==================================================
 
-# 距離行列をRAMに置かずmemmapで扱う
-USE_MEMMAP = True
-
-# --------------------------------------------------
-# Wasserstein計算用の周波数方向チャンクサイズ
-#
-# 1回にこの本数の周波数binだけ処理する。
-#
-# 小さくするとRAM使用量は減るが遅くなる。
-# 大きくすると速くなるがRAM使用量が増える。
-# --------------------------------------------------
-
-CDF_CHUNK_SIZE = 16384
-
-# --------------------------------------------------
-# 距離計算時に一度に保持するCDF本数
-#
-# 1本あたり、524289 bin × float64 ≈ 4 MB。
-# 16本なら約67 MBなので、WSLで安全側に寄せる。
-# --------------------------------------------------
+# 一度に保持するCDF本数。1本 = L x 8 byte (L=524289 なら約4MB)。
+# 同時に最大 2 ブロック + 作業用コピーを持つので、16なら約200〜300MB。
 CDF_BLOCK_SIZE = 16
 
-# --------------------------------------------------
-# REBUILD_CACHE=False の差分計算で、今回新規に追加された
-# ファイルのCDFをRAMに保持する上限。
-#
-# 新規ファイルが少ない場合は、ここにあるCDFを全距離計算で
-# 使い回す。これにより、例えばEを1本追加した場合、
-# A-E, B-E, C-E, ... でCDF(E)を作り直さない。
-# --------------------------------------------------
-NEW_CDF_CACHE_MAX_MB = 512
+# 距離計算の途中経過(distance_state.npz)を保存する間隔[秒]。
+CHECKPOINT_SECONDS = 120
+
+# 完了後に、ランダムに選んだこの本数のwavを計算し直して行列と突き合わせる(0で無効)。
+VERIFY_FILES = 6
 
 
 # ==================================================
-# 出力ファイル
+# 内部定数
 # ==================================================
 
-os.makedirs(OUT_DIR, exist_ok=True)
+# スペクトル/距離の計算式を変えたら必ず上げる(古いキャッシュが自動で使われなくなる)。
+CODE_VERSION = 3        # スペクトル(および線形軸L1/L2の距離)の定義を変えたときだけ上げる。対数軸の定義はfingerprint側で区別する
+SPECTRUM_VERSION = 3    # スペクトル自体の計算式(変えない限りキャッシュを再利用)
 
-ROOT_DIR_ABS = os.path.abspath(ROOT_DIR)
-OUT_DIR_ABS = os.path.abspath(OUT_DIR)
-
-
-RAW_NPY = os.path.join(
-    OUT_DIR,
-    "distance_matrix_raw.npy"
-)
-
-RAW_CSV = os.path.join(
-    OUT_DIR,
-    "distance_matrix_raw.csv"
-)
-
-NORMALIZED_NPY = os.path.join(
-    OUT_DIR,
-    "distance_matrix_normalized.npy"
-)
-
-NORMALIZED_CSV = os.path.join(
-    OUT_DIR,
-    "distance_matrix_normalized.csv"
-)
-
-SPECTRA_NPY = os.path.join(
-    OUT_DIR,
-    "spectra.npy"
-)
-
-FREQS_NPY = os.path.join(
-    OUT_DIR,
-    "freqs.npy"
-)
-
-FILE_INFO_CSV = os.path.join(
-    OUT_DIR,
-    "file_info.csv"
-)
-
-GROUP_INFO_CSV = os.path.join(
-    OUT_DIR,
-    "group_info.csv"
-)
-
-SHA256_CACHE_JSON = os.path.join(
-    OUT_DIR,
-    "sha256_cache.json"
-)
-
-OLD_CSV_MEMMAP = os.path.join(
-    OUT_DIR,
-    "_old_distance_matrix_from_csv.npy"
-)
-
-RAW_TMP_NPY = os.path.join(
-    OUT_DIR,
-    "_distance_matrix_raw_work.npy"
-)
+TMP_MARK = ".tmp-"
 
 
 # ==================================================
-# パス判定
+# 原子的な書き込み
+# ==================================================
+
+def _fsync_dir(directory):
+
+    try:
+
+        fd = os.open(directory or ".", os.O_RDONLY)
+
+    except OSError:
+
+        return
+
+    try:
+
+        os.fsync(fd)
+
+    except OSError:
+
+        pass
+
+    finally:
+
+        os.close(fd)
+
+
+def atomic_write(path, writer, text=False):
+    """
+    path に直接書かず、同じディレクトリの一時ファイルに書いて
+    fsync してから os.replace する。途中で落ちても path は
+    「古い完成品」か「新しい完成品」のどちらかのまま。
+    """
+
+    path = os.path.abspath(path)
+    directory = os.path.dirname(path)
+
+    os.makedirs(directory, exist_ok=True)
+
+    tmp = f"{path}{TMP_MARK}{os.getpid()}"
+
+    try:
+
+        if text:
+
+            with open(tmp, "w", encoding="utf-8", newline="") as f:
+
+                writer(f)
+                f.flush()
+                os.fsync(f.fileno())
+
+        else:
+
+            with open(tmp, "wb") as f:
+
+                writer(f)
+                f.flush()
+                os.fsync(f.fileno())
+
+        os.replace(tmp, path)
+
+    except BaseException:
+
+        try:
+
+            os.remove(tmp)
+
+        except OSError:
+
+            pass
+
+        raise
+
+    _fsync_dir(directory)
+
+
+def atomic_save_npy(path, array):
+
+    atomic_write(
+        path,
+        lambda f: np.save(f, array, allow_pickle=False)
+    )
+
+
+def atomic_save_json(path, obj):
+
+    atomic_write(
+        path,
+        lambda f: json.dump(obj, f, ensure_ascii=False, indent=2),
+        text=True
+    )
+
+
+def _pid_alive(pid):
+
+    if pid == os.getpid():
+
+        return True
+
+    if os.name != "posix":
+
+        # Windowsのos.killは「終了」を意味してしまうので使わない。
+        return True
+
+    try:
+
+        os.kill(pid, 0)
+
+    except ProcessLookupError:
+
+        return False
+
+    except OSError:
+
+        return True
+
+    return True
+
+
+def cleanup_stale_tmp(directory):
+    """前回クラッシュで残った一時ファイル(生きていないPIDのもの)を削除する。"""
+
+    removed = 0
+
+    for dirpath, _, filenames in os.walk(directory):
+
+        for filename in filenames:
+
+            if TMP_MARK not in filename:
+
+                continue
+
+            pid_text = filename.rsplit(TMP_MARK, 1)[1]
+
+            if not pid_text.isdigit():
+
+                continue
+
+            if _pid_alive(int(pid_text)):
+
+                continue
+
+            try:
+
+                os.remove(os.path.join(dirpath, filename))
+                removed += 1
+
+            except OSError:
+
+                pass
+
+    if removed:
+
+        print(
+            f"Removed {removed} stale temp file(s) in {directory}"
+        )
+
+
+# ==================================================
+# パス判定 / SHA256
 # ==================================================
 
 def is_path_inside(path, directory):
@@ -189,26 +331,14 @@ def is_path_inside(path, directory):
 
     try:
 
-        return (
-            os.path.commonpath(
-                [path, directory]
-            )
-            == directory
-        )
+        return os.path.commonpath([path, directory]) == directory
 
     except ValueError:
 
         return False
 
 
-# ==================================================
-# SHA256
-# ==================================================
-
-def compute_sha256(
-    file_path,
-    chunk_size=1024 * 1024
-):
+def compute_sha256(file_path, chunk_size=1024 * 1024):
 
     sha256 = hashlib.sha256()
 
@@ -216,62 +346,15 @@ def compute_sha256(
 
         while True:
 
-            chunk = f.read(
-                chunk_size
-            )
+            chunk = f.read(chunk_size)
 
             if not chunk:
+
                 break
 
             sha256.update(chunk)
 
     return sha256.hexdigest()
-
-
-# ==================================================
-# relative_name 正規化
-# ==================================================
-
-def normalize_relative_name(name):
-
-    name = str(name).replace(
-        "\\",
-        "/"
-    )
-
-    while name.startswith("./"):
-
-        name = name[2:]
-
-    name = name.lstrip("/")
-
-    root_prefix = (
-        ROOT_DIR_ABS
-        .replace("\\", "/")
-        .rstrip("/")
-        + "/"
-    )
-
-    out_prefix = (
-        OUT_DIR_ABS
-        .replace("\\", "/")
-        .rstrip("/")
-        + "/"
-    )
-
-    if name.startswith(root_prefix):
-
-        name = name[
-            len(root_prefix):
-        ]
-
-    if name.startswith(out_prefix):
-
-        name = name[
-            len(out_prefix):
-        ]
-
-    return name
 
 
 # ==================================================
@@ -282,44 +365,21 @@ def parse_wasserstein_mode(mode):
 
     mode_lower = mode.lower()
 
-    if "2" in mode_lower:
+    order = 2 if "2" in mode_lower else 1
 
-        order = 2
-
-    else:
-
-        order = 1
-
-    if mode_lower.startswith("lb"):
-
-        use_log_axis = True
-
-    else:
-
-        use_log_axis = False
+    use_log_axis = mode_lower.startswith("lb")
 
     return order, use_log_axis
-
-
-WASSERSTEIN_ORDER, USE_LOG_AXIS = (
-    parse_wasserstein_mode(
-        WASSERSTEIN_MODE
-    )
-)
 
 
 # ==================================================
 # スペクトル計算
 # ==================================================
 
-def compute_spectrum_distribution(
-    file_path
-):
+def compute_spectrum_distribution(file_path):
+    """wav -> 総和1のスペクトル分布(float64)。"""
 
-    y, sr = librosa.load(
-        file_path,
-        sr=None
-    )
+    y, sr = librosa.load(file_path, sr=None)
 
     if sr != TARGET_SR:
 
@@ -329,2539 +389,1250 @@ def compute_spectrum_distribution(
             target_sr=TARGET_SR
         )
 
-        sr = TARGET_SR
+    # numpyのバージョンによりrfftが float32 のまま計算されることがあるので、
+    # 再現性のため明示的にfloat64で計算する。
+    y = np.asarray(y, dtype=np.float64)
 
-    spectrum = np.abs(
-        np.fft.rfft(y)
-    )
+    spectrum = np.abs(np.fft.rfft(y))
 
     spectrum += 1e-12
 
-    total = np.sum(
-        spectrum,
-        dtype=np.float64
-    )
-
-    spectrum /= total
+    spectrum /= np.sum(spectrum, dtype=np.float64)
 
     return spectrum
 
 
 # ==================================================
-# 1次元 Wasserstein距離
-#
-# CDF方式
-#
-# W1(p,q)
-#   = integral |CDF_p(x) - CDF_q(x)| dx
-#
-# quantileは一切使わない。
-#
-# さらに、巨大なCDF配列を作らないため、
-# 周波数軸をチャンクごとに処理する。
+# スペクトルキャッシュ(SHA256ごとに1ファイル)
 # ==================================================
 
-def wasserstein_distance_cdf(
-    spectrum1,
-    spectrum2,
-    df,
-    chunk_size=CDF_CHUNK_SIZE
-):
+def spectra_dir():
 
-    n = min(
-        len(spectrum1),
-        len(spectrum2)
+    return os.path.join(
+        SPECTRA_CACHE_ROOT,
+        f"sr{TARGET_SR}_v{SPECTRUM_VERSION}"
     )
 
-    cumulative1 = 0.0
-    cumulative2 = 0.0
-    distance = 0.0
 
-    for start in range(0, n, chunk_size):
+def spectrum_path(sha):
 
-        end = min(
-            start + chunk_size,
-            n
-        )
-
-        s1 = np.asarray(
-            spectrum1[start:end],
-            dtype=np.float64
-        )
-        s2 = np.asarray(
-            spectrum2[start:end],
-            dtype=np.float64
-        )
-
-        cdf1 = cumulative1 + np.cumsum(
-            s1,
-            dtype=np.float64
-        )
-        cdf2 = cumulative2 + np.cumsum(
-            s2,
-            dtype=np.float64
-        )
-
-        if WASSERSTEIN_ORDER == 1:
-            distance += np.sum(
-                np.abs(cdf1 - cdf2),
-                dtype=np.float64
-            ) * df
-        elif WASSERSTEIN_ORDER == 2:
-            distance += np.sum(
-                (cdf1 - cdf2) ** 2,
-                dtype=np.float64
-            ) * df
-        else:
-            raise ValueError(
-                "Wasserstein order must be 1 or 2."
-            )
-
-        cumulative1 = float(cdf1[-1])
-        cumulative2 = float(cdf2[-1])
-
-        del s1, s2, cdf1, cdf2
-
-    if WASSERSTEIN_ORDER == 1:
-        return float(distance)
-
-    return float(np.sqrt(distance))
-
-
-def make_cdf_block(
-    spectra,
-    indices
-):
-    """
-    spectraの指定indicesについてCDFを一度だけ作る。
-
-    返り値は shape=(len(indices), spectrum_length) のfloat64配列。
-    全1532本を保持せず、最大CDF_BLOCK_SIZE本だけを一時保持する。
-    """
-
-    count = len(indices)
-
-    if count == 0:
-        return np.empty(
-            (0, spectra.shape[1]),
-            dtype=np.float64
-        )
-
-    cdf_block = np.empty(
-        (count, spectra.shape[1]),
-        dtype=np.float64
+    return os.path.join(
+        spectra_dir(),
+        sha[:2],
+        sha + ".npy"
     )
 
-    for local_i, global_i in enumerate(indices):
 
-        row = np.asarray(
-            spectra[global_i, :],
-            dtype=np.float64
-        )
+class CorruptSpectrum(Exception):
 
-        np.cumsum(
-            row,
-            dtype=np.float64,
-            out=cdf_block[local_i]
-        )
+    def __init__(self, sha, name, reason):
 
-        del row
+        super().__init__(f"{name} ({sha[:12]}...): {reason}")
 
-    return cdf_block
+        self.sha = sha
+        self.name = name
+        self.reason = reason
 
 
-def wasserstein_distance_from_cdf(
-    cdf1,
-    cdf2,
-    df,
-    chunk_size=CDF_CHUNK_SIZE
-):
-    """既に作成済みのCDF同士からWasserstein距離を計算する。"""
+def ensure_spectra(current_files, current_sha256):
+    """キャッシュに無いSHA256のスペクトルだけを計算して保存する(1本ずつ原子的)。"""
 
-    n = min(
-        len(cdf1),
-        len(cdf2)
-    )
+    todo = {}
+    unique = set()
 
-    distance = 0.0
+    for item in current_files:
 
-    for start in range(0, n, chunk_size):
+        sha = current_sha256[item["relative_name"]]
 
-        end = min(
-            start + chunk_size,
-            n
-        )
+        unique.add(sha)
 
-        a = cdf1[start:end]
-        b = cdf2[start:end]
-
-        if WASSERSTEIN_ORDER == 1:
-            distance += np.sum(
-                np.abs(a - b),
-                dtype=np.float64
-            ) * df
-        elif WASSERSTEIN_ORDER == 2:
-            distance += np.sum(
-                (a - b) ** 2,
-                dtype=np.float64
-            ) * df
-        else:
-            raise ValueError(
-                "Wasserstein order must be 1 or 2."
-            )
-
-    if WASSERSTEIN_ORDER == 1:
-        return float(distance)
-
-    return float(np.sqrt(distance))
-
-
-# ==================================================
-# WAVファイル探索
-# ==================================================
-
-current_files = []
-
-for group_index, group_name in enumerate(
-    TARGET_DIRS
-):
-
-    group_dir = os.path.join(
-        ROOT_DIR,
-        group_name
-    )
-
-    if not os.path.isdir(
-        group_dir
-    ):
-
-        print(
-            f"WARNING: directory not found: "
-            f"{group_dir}"
-        )
-
-        continue
-
-    filenames = sorted(
-        filename
-        for filename in os.listdir(
-            group_dir
-        )
-        if filename.lower().endswith(
-            ".wav"
-        )
-    )
-
-    for filename in filenames:
-
-        file_path = os.path.join(
-            group_dir,
-            filename
-        )
-
-        if is_path_inside(
-            file_path,
-            OUT_DIR_ABS
-        ):
+        if sha in todo:
 
             continue
 
-        if KEYWORD and KEYWORD not in filename:
+        if not os.path.exists(spectrum_path(sha)):
 
-            continue
-
-        relative_name = (
-            f"{group_name}/{filename}"
-        )
-
-        current_files.append(
-            {
-                "group_name": group_name,
-                "filename": filename,
-                "relative_name": relative_name,
-                "path": file_path
-            }
-        )
-
-
-if len(current_files) == 0:
-
-    raise RuntimeError(
-        "No WAV files were found."
-    )
-
-
-print()
-print(
-    f"Current WAV files: "
-    f"{len(current_files)}"
-)
-
-
-# ==================================================
-# 現在のファイル名
-# ==================================================
-
-current_names = [
-    item["relative_name"]
-    for item in current_files
-]
-
-current_name_to_index = {
-    name: i
-    for i, name in enumerate(
-        current_names
-    )
-}
-
-
-# ==================================================
-# 以前の file_info.csv
-# ==================================================
-
-old_file_info_names = []
-
-if (
-    not REBUILD_CACHE
-    and os.path.exists(
-        FILE_INFO_CSV
-    )
-):
-
-    try:
-
-        old_file_info_df = pd.read_csv(
-            FILE_INFO_CSV,
-            usecols=["relative_name"]
-        )
-
-        old_file_info_names = [
-            normalize_relative_name(
-                name
-            )
-            for name in
-            old_file_info_df[
-                "relative_name"
-            ].astype(str)
-        ]
-
-    except Exception as e:
-
-        print(
-            "WARNING: failed to read old "
-            f"file_info.csv: {e}"
-        )
-
-        old_file_info_names = []
-
-
-old_name_to_index = {
-    name: i
-    for i, name in enumerate(
-        old_file_info_names
-    )
-}
-
-
-# ==================================================
-# SHA256キャッシュ読み込み
-# ==================================================
-
-old_sha256_cache = {}
-
-if (
-    not REBUILD_CACHE
-    and os.path.exists(
-        SHA256_CACHE_JSON
-    )
-):
-
-    try:
-
-        with open(
-            SHA256_CACHE_JSON,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            old_sha256_cache = json.load(f)
-
-        old_sha256_cache = {
-            normalize_relative_name(k): v
-            for k, v in
-            old_sha256_cache.items()
-        }
-
-    except Exception as e:
-
-        print(
-            "WARNING: failed to read "
-            f"sha256_cache.json: {e}"
-        )
-
-        old_sha256_cache = {}
-
-
-# ==================================================
-# 現在のSHA256
-# ==================================================
-
-print()
-print(
-    "Calculating SHA256..."
-)
-
-current_sha256 = {}
-
-for i, item in enumerate(
-    current_files
-):
-
-    name = item["relative_name"]
-
-    current_sha256[name] = (
-        compute_sha256(
-            item["path"]
-        )
-    )
-
-    if (
-        (i + 1) % 50 == 0
-        or i + 1 == len(current_files)
-    ):
-
-        print(
-            f"\r  SHA256: "
-            f"{i + 1}/{len(current_files)}",
-            end="",
-            flush=True
-        )
-
-print()
-
-
-# ==================================================
-# 新規・削除・既存
-# ==================================================
-
-old_names_set = set(
-    old_file_info_names
-)
-
-current_names_set = set(
-    current_names
-)
-
-new_names = sorted(
-    current_names_set
-    - old_names_set
-)
-
-removed_names = sorted(
-    old_names_set
-    - current_names_set
-)
-
-existing_names = sorted(
-    current_names_set
-    & old_names_set
-)
-
-
-print()
-print(
-    f"New files     : "
-    f"{len(new_names)}"
-)
-
-print(
-    f"Removed files : "
-    f"{len(removed_names)}"
-)
-
-print(
-    f"Existing files: "
-    f"{len(existing_names)}"
-)
-
-
-# ==================================================
-# SHA256によるrename検出
-# ==================================================
-
-old_hash_to_names = {}
-
-for name, sha256 in (
-    old_sha256_cache.items()
-):
-
-    old_hash_to_names.setdefault(
-        sha256,
-        []
-    ).append(name)
-
-
-renamed_pairs = []
-
-for name in new_names:
-
-    sha256 = current_sha256.get(
-        name
-    )
-
-    if sha256 is None:
-        continue
-
-    candidates = (
-        old_hash_to_names.get(
-            sha256,
-            []
-        )
-    )
-
-    for old_name in candidates:
-
-        if old_name in old_names_set:
-
-            renamed_pairs.append(
-                (
-                    old_name,
-                    name
-                )
-            )
-
-            break
-
-
-if renamed_pairs:
+            todo[sha] = item
 
     print()
     print(
-        "Detected renamed files:"
+        f"Spectra: reused {len(unique) - len(todo)}, "
+        f"to compute {len(todo)}"
     )
 
-    for old_name, new_name in (
-        renamed_pairs
-    ):
+    for k, (sha, item) in enumerate(todo.items(), 1):
 
-        print(
-            f"  {old_name} -> {new_name}"
+        spectrum = compute_spectrum_distribution(item["path"])
+
+        atomic_save_npy(
+            spectrum_path(sha),
+            spectrum.astype(np.float32)
         )
-
-
-# ==================================================
-# 旧spectra.npyをmemmapで読む
-# ==================================================
-
-old_spectra = None
-old_spectra_names = []
-
-if (
-    not REBUILD_CACHE
-    and os.path.exists(
-        SPECTRA_NPY
-    )
-):
-
-    try:
-
-        old_spectra = np.load(
-            SPECTRA_NPY,
-            mmap_mode="r"
-        )
-
-        old_spectra_names = list(
-            old_file_info_names
-        )
-
-        if (
-            old_spectra.ndim != 2
-            or old_spectra.shape[0]
-            != len(old_spectra_names)
-        ):
-
-            print(
-                "WARNING: spectra.npy and "
-                "file_info.csv size mismatch."
-            )
-
-            old_spectra = None
-            old_spectra_names = []
-
-        else:
-
-            print()
-            print(
-                "Loaded old spectra as "
-                "memory-mapped array:"
-            )
-
-            print(
-                f"  shape = "
-                f"{old_spectra.shape}"
-            )
-
-    except Exception as e:
-
-        print(
-            "WARNING: failed to load old "
-            f"spectra.npy: {e}"
-        )
-
-        old_spectra = None
-        old_spectra_names = []
-
-
-# ==================================================
-# 旧spectraのhash -> index
-# ==================================================
-
-old_spectrum_hash_to_index = {}
-
-if old_spectra is not None:
-
-    for i, name in enumerate(
-        old_spectra_names
-    ):
-
-        sha256 = old_sha256_cache.get(
-            name
-        )
-
-        if sha256 is None:
-            continue
-
-        if (
-            sha256
-            not in old_spectrum_hash_to_index
-        ):
-
-            old_spectrum_hash_to_index[
-                sha256
-            ] = i
-
-
-# ==================================================
-# スペクトルキャッシュ準備
-#
-# 重要:
-#
-# 以前:
-#
-# computed_spectrum_cache[i] = spectrum
-#
-# として全新規スペクトルをRAMに保存していた。
-#
-# 今回は絶対に保存しない。
-#
-# 新規スペクトルは、
-#
-#   1本計算
-#   ↓
-#   spectra.npyへ書く
-#   ↓
-#   Python変数を解放
-#
-# とする。
-# ==================================================
-
-N = len(
-    current_files
-)
-
-print()
-print(
-    "Preparing spectra cache..."
-)
-
-
-spectrum_sources = []
-
-new_spectrum_count = 0
-reused_spectrum_count = 0
-
-
-for i, item in enumerate(
-    current_files
-):
-
-    name = item["relative_name"]
-
-    sha256 = current_sha256[name]
-
-    source = None
-
-    # --------------------------------------------------
-    # 1. 同じファイル名 + SHA一致
-    # --------------------------------------------------
-
-    if (
-        old_spectra is not None
-        and name in old_name_to_index
-        and name in old_sha256_cache
-        and old_sha256_cache[name]
-        == sha256
-    ):
-
-        old_i = old_name_to_index[
-            name
-        ]
-
-        if (
-            old_i
-            < old_spectra.shape[0]
-        ):
-
-            source = (
-                "old_index",
-                old_i
-            )
-
-    # --------------------------------------------------
-    # 2. SHA一致によるrename再利用
-    # --------------------------------------------------
-
-    if source is None:
-
-        old_i = (
-            old_spectrum_hash_to_index.get(
-                sha256
-            )
-        )
-
-        if old_i is not None:
-
-            source = (
-                "old_index",
-                old_i
-            )
-
-    # --------------------------------------------------
-    # 3. 新規計算
-    # --------------------------------------------------
-
-    if source is None:
-
-        source = (
-            "compute",
-            None
-        )
-
-        new_spectrum_count += 1
-
-    else:
-
-        reused_spectrum_count += 1
-
-    spectrum_sources.append(
-        source
-    )
-
-
-print(
-    f"  Reused spectra: "
-    f"{reused_spectrum_count}"
-)
-
-print(
-    f"  New spectra   : "
-    f"{new_spectrum_count}"
-)
-
-
-# ==================================================
-# スペクトル長を決める
-#
-# 新規スペクトルを全部保存しない。
-# 最初の1本だけ計算して長さを確認する。
-# ==================================================
-
-old_spectrum_length = None
-
-if old_spectra is not None:
-
-    old_spectrum_length = (
-        old_spectra.shape[1]
-    )
-
-
-min_len = old_spectrum_length
-
-
-if min_len is None:
-
-    min_len = None
-
-
-for i, item in enumerate(
-    current_files
-):
-
-    source_type, source_index = (
-        spectrum_sources[i]
-    )
-
-    if source_type == "compute":
-
-        spectrum = (
-            compute_spectrum_distribution(
-                item["path"]
-            )
-        )
-
-        spectrum_length = len(
-            spectrum
-        )
-
-        if min_len is None:
-
-            min_len = spectrum_length
-
-        else:
-
-            min_len = min(
-                min_len,
-                spectrum_length
-            )
-
-        # ------------------------------------------
-        # 最初の新規スペクトル長が分かった時点で
-        # 目的を達成しているので終了。
-        #
-        # 全ファイルを計算しない。
-        # ------------------------------------------
 
         del spectrum
 
-        break
-
-
-if min_len is None:
-
-    raise RuntimeError(
-        "Could not determine spectrum length."
-    )
-
-
-print()
-print(
-    f"Spectrum length: "
-    f"{min_len}"
-)
-
-
-# ==================================================
-# spectra.npy作成
-# ==================================================
-
-if os.path.exists(
-    SPECTRA_NPY
-):
-
-    try:
-
-        os.remove(
-            SPECTRA_NPY
-        )
-
-    except PermissionError:
-
-        raise RuntimeError(
-            "Could not overwrite spectra.npy. "
-            "Please close any program using it."
-        )
-
-
-spectra = np.lib.format.open_memmap(
-    SPECTRA_NPY,
-    mode="w+",
-    dtype=np.float32,
-    shape=(
-        N,
-        min_len
-    )
-)
-
-
-print()
-print(
-    "Writing spectra.npy..."
-)
-
-
-for i, item in enumerate(
-    current_files
-):
-
-    source_type, source_index = (
-        spectrum_sources[i]
-    )
-
-    if source_type == "old_index":
-
-        spectrum = old_spectra[
-            source_index,
-            :min_len
-        ]
-
-        spectra[i, :] = spectrum
-
-    else:
-
-        # ------------------------------------------
-        # 新規スペクトルはここで1本だけ計算。
-        # 書き込んだら保持しない。
-        # ------------------------------------------
-
-        spectrum = (
-            compute_spectrum_distribution(
-                item["path"]
-            )
-        )
-
-        spectra[i, :] = spectrum[
-            :min_len
-        ]
-
-        del spectrum
-
-    if (
-        (i + 1) % 20 == 0
-        or i + 1 == N
-    ):
-
-        print(
-            f"\r  spectra: "
-            f"{i + 1}/{N}",
-            end="",
-            flush=True
-        )
-
-print()
-
-
-spectra.flush()
-
-
-# ==================================================
-# 古いspectraを解放
-# ==================================================
-
-old_spectra = None
-
-
-# ==================================================
-# 周波数軸
-# ==================================================
-
-freqs = np.linspace(
-    0,
-    TARGET_SR / 2,
-    min_len,
-    dtype=np.float64
-)
-
-np.save(
-    FREQS_NPY,
-    freqs
-)
-
-
-# ==================================================
-# コスト軸
-# ==================================================
-#
-# CDF方式でも、距離を積分する軸は必要。
-#
-# 線形周波数:
-#
-#   df = freqs[k+1] - freqs[k]
-#
-# log軸を使う場合:
-#
-#   x = log(f + 1)
-#
-# として積分する。
-# ==================================================
-
-if USE_LOG_AXIS:
-
-    cost_axis = np.log(
-        freqs + 1.0
-    )
-
-else:
-
-    cost_axis = freqs
-
-
-if min_len > 1:
-
-    df = float(
-        cost_axis[1]
-        - cost_axis[0]
-    )
-
-else:
-
-    df = 1.0
-
-
-# ==================================================
-# SHA256 cache保存
-# ==================================================
-
-with open(
-    SHA256_CACHE_JSON,
-    "w",
-    encoding="utf-8"
-) as f:
-
-    json.dump(
-        current_sha256,
-        f,
-        ensure_ascii=False,
-        indent=2
-    )
-
-
-# ==================================================
-# file_info / group_info
-# ==================================================
-
-file_info_rows = []
-
-for i, item in enumerate(
-    current_files
-):
-
-    file_info_rows.append(
-        {
-            "index": i,
-            "group_index": -1,
-            "group_name": item[
-                "group_name"
-            ],
-            "filename": item[
-                "filename"
-            ],
-            "relative_name": item[
-                "relative_name"
-            ],
-            "path": item[
-                "path"
-            ]
-        }
-    )
-
-
-group_info_rows = []
-
-for group_index, group_name in enumerate(
-    TARGET_DIRS
-):
-
-    indices = [
-        i
-        for i, item in enumerate(
-            current_files
-        )
-        if item["group_name"]
-        == group_name
-    ]
-
-    if not indices:
-
-        continue
-
-    start = min(
-        indices
-    )
-
-    end = max(
-        indices
-    )
-
-    size = len(
-        indices
-    )
-
-    group_info_rows.append(
-        {
-            "group_index": group_index,
-            "group_name": group_name,
-            "size": size,
-            "start": start,
-            "end": end
-        }
-    )
-
-    for i in indices:
-
-        file_info_rows[i][
-            "group_index"
-        ] = group_index
-
-
-file_info_df = pd.DataFrame(
-    file_info_rows
-)
-
-group_info_df = pd.DataFrame(
-    group_info_rows
-)
-
-
-file_info_df.to_csv(
-    FILE_INFO_CSV,
-    index=False
-)
-
-group_info_df.to_csv(
-    GROUP_INFO_CSV,
-    index=False
-)
-
-
-# ==================================================
-# グループ情報
-# ==================================================
-
-file_to_group = np.full(
-    N,
-    -1,
-    dtype=np.int32
-)
-
-group_starts = []
-group_sizes = []
-
-for row in group_info_rows:
-
-    group_index = row[
-        "group_index"
-    ]
-
-    start = row[
-        "start"
-    ]
-
-    size = row[
-        "size"
-    ]
-
-    group_starts.append(
-        start
-    )
-
-    group_sizes.append(
-        size
-    )
-
-    file_to_group[
-        start:start + size
-    ] = group_index
-
-
-GROUP_COUNT = len(
-    group_info_rows
-)
-
-
-# ==================================================
-# display_groups.json
-# ==================================================
-
-if not os.path.exists(
-    DISPLAY_GROUPS_JSON
-):
-
-    display_groups = []
-
-    for row in group_info_rows:
-
-        display_groups.append(
-            {
-                "group_name": row[
-                    "group_name"
-                ],
-                "group_index": row[
-                    "group_index"
-                ]
-            }
-        )
-
-    with open(
-        DISPLAY_GROUPS_JSON,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            display_groups,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
-else:
-
-    try:
-
-        with open(
-            DISPLAY_GROUPS_JSON,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            display_groups = json.load(
-                f
-            )
-
-    except Exception as e:
-
-        print(
-            "WARNING: failed to read "
-            f"display_groups.json: {e}"
-        )
-
-        display_groups = []
-
-
-# ==================================================
-# 旧距離行列
-# ==================================================
-
-old_D = None
-old_D_names = []
-
-
-def read_csv_names_only(
-    csv_path
-):
-
-    if not os.path.exists(
-        csv_path
-    ):
-
-        return []
-
-    try:
-
-        df_names = pd.read_csv(
-            csv_path,
-            usecols=[0]
-        )
-
-        return [
-            normalize_relative_name(
-                name
-            )
-            for name in
-            df_names.iloc[
-                :,
-                0
-            ].astype(str)
-        ]
-
-    except Exception as e:
-
-        print(
-            "WARNING: failed to read distance "
-            f"CSV names: {e}"
-        )
-
-        return []
-
-
-def get_csv_column_count(
-    csv_path
-):
-
-    try:
-
-        with open(
-            csv_path,
-            "r",
-            encoding="utf-8",
-            newline=""
-        ) as f:
-
-            reader = csv.reader(
-                f
-            )
-
-            header = next(
-                reader
-            )
-
-        return len(
-            header
-        ) - 1
-
-    except Exception:
-
-        return -1
-
-
-# ==================================================
-# 旧CSVの名前だけ取得
-# ==================================================
-
-if (
-    not REBUILD_CACHE
-    and os.path.exists(
-        RAW_CSV
-    )
-):
-
-    old_D_names = (
-        read_csv_names_only(
-            RAW_CSV
-        )
-    )
-
-
-# ==================================================
-# 旧NPYをmemmapで読む
-# ==================================================
-
-if (
-    not REBUILD_CACHE
-    and os.path.exists(
-        RAW_NPY
-    )
-):
-
-    try:
-
-        candidate_D = np.load(
-            RAW_NPY,
-            mmap_mode="r"
-        )
-
-        if (
-            candidate_D.ndim == 2
-            and candidate_D.shape[0]
-            == candidate_D.shape[1]
-            and candidate_D.shape[0]
-            == len(old_D_names)
-        ):
-
-            old_D = candidate_D
-
-            print()
-            print(
-                "Loaded old distance matrix "
-                "as memory-mapped array:"
-            )
+        if k % 10 == 0 or k == len(todo):
 
             print(
-                f"  shape = "
-                f"{old_D.shape}"
-            )
-
-        else:
-
-            print()
-            print(
-                "WARNING: cached NPY matrix "
-                "size mismatch:"
-            )
-
-            print(
-                f"  matrix = "
-                f"{candidate_D.shape}"
-            )
-
-            print(
-                f"  names  = "
-                f"{len(old_D_names)}"
-            )
-
-            old_D = None
-
-    except Exception as e:
-
-        print()
-        print(
-            "WARNING: failed to load "
-            f"distance_matrix_raw.npy: {e}"
-        )
-
-        old_D = None
-
-
-# ==================================================
-# CSVしかない場合
-# ==================================================
-
-if (
-    not REBUILD_CACHE
-    and old_D is None
-    and os.path.exists(
-        RAW_CSV
-    )
-    and len(old_D_names) > 0
-):
-
-    csv_size = get_csv_column_count(
-        RAW_CSV
-    )
-
-    if csv_size == len(
-        old_D_names
-    ):
-
-        print()
-        print(
-            "Converting cached CSV distance "
-            "matrix to disk-backed NPY..."
-        )
-
-        if os.path.exists(
-            OLD_CSV_MEMMAP
-        ):
-
-            try:
-
-                os.remove(
-                    OLD_CSV_MEMMAP
-                )
-
-            except PermissionError:
-
-                pass
-
-        csv_D = np.lib.format.open_memmap(
-            OLD_CSV_MEMMAP,
-            mode="w+",
-            dtype=np.float64,
-            shape=(
-                csv_size,
-                csv_size
-            )
-        )
-
-        with open(
-            RAW_CSV,
-            "r",
-            encoding="utf-8",
-            newline=""
-        ) as f:
-
-            reader = csv.reader(
-                f
-            )
-
-            header = next(
-                reader
-            )
-
-            for i, row in enumerate(
-                reader
-            ):
-
-                if len(row) != (
-                    csv_size + 1
-                ):
-
-                    raise RuntimeError(
-                        "Malformed distance CSV at "
-                        f"row {i + 1}: "
-                        f"expected "
-                        f"{csv_size + 1} "
-                        f"columns, got "
-                        f"{len(row)}"
-                    )
-
-                csv_D[i, :] = (
-                    np.asarray(
-                        row[1:],
-                        dtype=np.float64
-                    )
-                )
-
-                if (
-                    (i + 1) % 20 == 0
-                    or i + 1 == csv_size
-                ):
-
-                    print(
-                        f"\r  CSV -> NPY: "
-                        f"{i + 1}/{csv_size}",
-                        end="",
-                        flush=True
-                    )
-
-        print()
-
-        csv_D.flush()
-
-        old_D = np.load(
-            OLD_CSV_MEMMAP,
-            mmap_mode="r"
-        )
-
-        print(
-            "Using CSV-derived disk-backed "
-            "distance matrix."
-        )
-
-    else:
-
-        print()
-        print(
-            "WARNING: old distance CSV is "
-            "not internally square."
-        )
-
-        print(
-            f"  CSV columns = "
-            f"{csv_size}"
-        )
-
-        print(
-            f"  CSV names   = "
-            f"{len(old_D_names)}"
-        )
-
-
-# ==================================================
-# 距離キャッシュindex
-# ==================================================
-
-old_distance_name_to_index = {}
-
-if old_D is not None:
-
-    old_distance_name_to_index = {
-        name: i
-        for i, name in enumerate(
-            old_D_names
-        )
-    }
-
-
-old_distance_hash_to_index = {}
-
-if old_D is not None:
-
-    for i, name in enumerate(
-        old_D_names
-    ):
-
-        sha256 = old_sha256_cache.get(
-            name
-        )
-
-        if sha256 is None:
-
-            continue
-
-        if (
-            sha256
-            not in old_distance_hash_to_index
-        ):
-
-            old_distance_hash_to_index[
-                sha256
-            ] = i
-
-
-# ==================================================
-# 距離行列作成
-# ==================================================
-
-if os.path.exists(
-    RAW_NPY
-):
-
-    if REBUILD_CACHE:
-
-        try:
-
-            os.remove(
-                RAW_NPY
-            )
-
-        except PermissionError:
-
-            raise RuntimeError(
-                "Could not remove existing "
-                "distance_matrix_raw.npy."
-            )
-
-
-if os.path.exists(
-    RAW_TMP_NPY
-):
-
-    try:
-
-        os.remove(
-            RAW_TMP_NPY
-        )
-
-    except PermissionError:
-
-        raise RuntimeError(
-            "Could not remove temporary "
-            "distance matrix."
-        )
-
-
-D = np.lib.format.open_memmap(
-    RAW_TMP_NPY,
-    mode="w+",
-    dtype=np.float64,
-    shape=(
-        N,
-        N
-    )
-)
-
-
-D[:, :] = 0.0
-
-
-# ==================================================
-# 進捗表示
-# ==================================================
-
-block_total_pairs = {}
-
-block_done_pairs = {}
-
-for gi in range(
-    GROUP_COUNT
-):
-
-    for gj in range(
-        gi,
-        GROUP_COUNT
-    ):
-
-        size_i = group_sizes[
-            gi
-        ]
-
-        size_j = group_sizes[
-            gj
-        ]
-
-        if gi == gj:
-
-            pair_count = (
-                size_i
-                * (size_i - 1)
-            ) // 2
-
-        else:
-
-            pair_count = (
-                size_i
-                * size_j
-            )
-
-        key = (
-            gi,
-            gj
-        )
-
-        block_total_pairs[
-            key
-        ] = pair_count
-
-        block_done_pairs[
-            key
-        ] = 0
-
-
-def progress_symbol(
-    done,
-    total
-):
-
-    if total <= 0:
-
-        return ""
-
-    ratio = (
-        done / total
-    )
-
-    width = 20
-
-    filled = int(
-        ratio * width
-    )
-
-    if filled > width:
-
-        filled = width
-
-    return (
-        "["
-        + "#" * filled
-        + "-" * (
-            width - filled
-        )
-        + "]"
-    )
-
-
-def render_block_progress(
-    gi,
-    gj
-):
-
-    key = (
-        gi,
-        gj
-    )
-
-    done = block_done_pairs[
-        key
-    ]
-
-    total = block_total_pairs[
-        key
-    ]
-
-    print(
-        f"\r"
-        f"block ({gi},{gj}) "
-        f"{progress_symbol(done, total)} "
-        f"{done}/{total}",
-        end="",
-        flush=True
-    )
-
-
-# ==================================================
-# 距離計算
-# ==================================================
-
-cache_hit_name = 0
-cache_hit_hash = 0
-zero_distance_count = 0
-new_distance_count = 0
-
-print()
-print(
-    "Calculating distance matrix..."
-)
-
-
-# ==================================================
-# 距離キャッシュ検索
-# ==================================================
-
-def get_cached_distance(
-    i,
-    j,
-    name_i,
-    name_j,
-    sha_i,
-    sha_j
-):
-    """
-    既存距離を探す。
-
-    優先順位:
-      1. 名前 + SHA一致
-      2. SHAによるrename再利用
-      3. 同一SHAなら0
-      4. None = 新規計算
-    """
-
-    global cache_hit_name
-    global cache_hit_hash
-    global zero_distance_count
-
-    if old_D is not None:
-
-        old_i = old_distance_name_to_index.get(
-            name_i
-        )
-        old_j = old_distance_name_to_index.get(
-            name_j
-        )
-
-        if old_i is not None and old_j is not None:
-
-            old_sha_i = old_sha256_cache.get(
-                name_i
-            )
-            old_sha_j = old_sha256_cache.get(
-                name_j
-            )
-
-            if (
-                old_sha_i is not None
-                and old_sha_j is not None
-                and old_sha_i == sha_i
-                and old_sha_j == sha_j
-            ):
-
-                cache_hit_name += 1
-
-                return float(
-                    old_D[old_i, old_j]
-                )
-
-        old_i = old_distance_hash_to_index.get(
-            sha_i
-        )
-        old_j = old_distance_hash_to_index.get(
-            sha_j
-        )
-
-        if old_i is not None and old_j is not None:
-
-            cache_hit_hash += 1
-
-            return float(
-                old_D[old_i, old_j]
-            )
-
-    if sha_i == sha_j:
-
-        zero_distance_count += 1
-        return 0.0
-
-    return None
-
-
-# ==================================================
-# REBUILD_CACHE=False 用の新規CDFキャッシュ
-# ==================================================
-#
-# ここが今回の重要な追加部分。
-#
-# 既存距離行列に対して新規ファイルを追加した場合、
-# 新規ファイルのCDFは「列側」に回ったときにも再利用する。
-#
-# 例:
-#
-#   A B C D F が既存
-#   E が新規
-#
-# CDF(E)を一度作ったら、
-#
-#   A-E, B-E, C-E, D-E, E-E, E-F
-#
-# の全てで同じCDF(E)を使う。
-# ==================================================
-
-new_cdf_cache = {}
-
-if not REBUILD_CACHE and old_D is not None:
-
-    new_indices = []
-
-    for idx, name in enumerate(current_names):
-
-        sha = current_sha256[name]
-
-        # SHAが旧距離行列に存在しないものだけが、
-        # 距離計算上の本当の新規ファイル。
-        if old_distance_hash_to_index.get(sha) is None:
-            new_indices.append(idx)
-
-    if new_indices:
-
-        bytes_per_cdf = (
-            min_len * np.dtype(np.float64).itemsize
-        )
-
-        max_cdf_count = max(
-            1,
-            int(
-                NEW_CDF_CACHE_MAX_MB
-                * 1024
-                * 1024
-                // bytes_per_cdf
-            )
-        )
-
-        cache_indices = new_indices[:max_cdf_count]
-
-        print()
-        print(
-            "Preparing incremental CDF cache..."
-        )
-        print(
-            f"  New distance files: {len(new_indices)}"
-        )
-        print(
-            f"  CDFs kept in RAM  : {len(cache_indices)}"
-        )
-        print(
-            f"  CDF cache limit   : {NEW_CDF_CACHE_MAX_MB} MB"
-        )
-
-        # CDFを1本ずつ作って保存する。
-        # 一度に全新規CDFを生成することで巨大な一時配列を作らない。
-        for count, idx in enumerate(cache_indices, 1):
-
-            cdf = make_cdf_block(
-                spectra,
-                [idx]
-            )[0]
-
-            new_cdf_cache[idx] = cdf
-
-            if (
-                count % 10 == 0
-                or count == len(cache_indices)
-            ):
-
-                print(
-                    f"\r  new CDF cache: "
-                    f"{count}/{len(cache_indices)}",
-                    end="",
-                    flush=True
-                )
-
-        print()
-
-    else:
-
-        print()
-        print(
-            "No new files requiring incremental CDF cache."
-        )
-
-
-# ==================================================
-# ブロック内のCDF取得
-# ==================================================
-
-def get_cdf_for_indices(indices):
-    """
-    指定indicesについてCDFを作る。
-
-    incremental cacheにあるindexは既存CDFを再利用する。
-    それ以外はこのブロック用に一度だけ生成する。
-
-    戻り値:
-      cdf_block, cached_mask
-
-    cached_mask=Trueの行はnew_cdf_cache由来であり、
-    呼び出し側で解放してはいけない。
-    """
-
-    count = len(indices)
-    spectrum_length = spectra.shape[1]
-
-    cdf_block = np.empty(
-        (count, spectrum_length),
-        dtype=np.float64
-    )
-
-    cached_mask = np.zeros(
-        count,
-        dtype=bool
-    )
-
-    for local_i, global_i in enumerate(indices):
-
-        cached = new_cdf_cache.get(
-            int(global_i)
-        )
-
-        if cached is not None:
-
-            cdf_block[local_i, :] = cached
-            cached_mask[local_i] = True
-
-        else:
-
-            row = np.asarray(
-                spectra[global_i, :],
-                dtype=np.float64
-            )
-
-            np.cumsum(
-                row,
-                dtype=np.float64,
-                out=cdf_block[local_i]
-            )
-
-            del row
-
-    return cdf_block, cached_mask
-
-
-# ==================================================
-# ブロック間距離計算
-# ==================================================
-#
-# iブロックのCDFを保持したまま、jブロックを順番に処理する。
-#
-#   i-block CDF
-#       |
-#       +-- j-block CDF -> 全ペア
-#       +-- j-block CDF -> 全ペア
-#       +-- j-block CDF -> 全ペア
-#       ...
-#
-# したがって、同じi-blockについてi側CDFを作り直さない。
-# さらにincremental CDF cacheに入った新規ファイルは、
-# i/jのどちら側にいても実行中ずっと再利用される。
-# ==================================================
-
-def calculate_block_pair(
-    gi,
-    gj,
-    start_i,
-    end_i,
-    start_j,
-    end_j
-):
-
-    global new_distance_count
-
-    key = (gi, gj)
-
-    same_group = (
-        gi == gj
-    )
-
-    # --------------------------------------------------
-    # i方向をCDF_BLOCK_SIZEずつ処理。
-    # 各iブロックのCDFは、そのiブロックに対する
-    # 全jブロックの処理が終わるまで保持する。
-    # --------------------------------------------------
-
-    for block_i_start in range(
-        start_i,
-        end_i,
-        CDF_BLOCK_SIZE
-    ):
-
-        block_i_end = min(
-            block_i_start + CDF_BLOCK_SIZE,
-            end_i
-        )
-
-        indices_i = np.arange(
-            block_i_start,
-            block_i_end,
-            dtype=np.int64
-        )
-
-        # --------------------------------------------------
-        # このiブロックについて、計算が必要なペアが
-        # 少なくとも1つあるかを先に確認する。
-        # 全てキャッシュ済みならCDFを一切作らない。
-        # --------------------------------------------------
-
-        cdf_i = None
-
-        # i-block CDFを使うj-blockを順番に処理。
-        for block_j_start in range(
-            start_j,
-            end_j,
-            CDF_BLOCK_SIZE
-        ):
-
-            block_j_end = min(
-                block_j_start + CDF_BLOCK_SIZE,
-                end_j
-            )
-
-            indices_j = np.arange(
-                block_j_start,
-                block_j_end,
-                dtype=np.int64
-            )
-
-            # --------------------------------------------------
-            # このサブブロックで新規計算が必要なペアを列挙。
-            # キャッシュ済み値はここでDへ書き込む。
-            # --------------------------------------------------
-
-            missing_pairs = []
-
-            for local_i, i in enumerate(indices_i):
-
-                i = int(i)
-                name_i = current_names[i]
-                sha_i = current_sha256[name_i]
-
-                j_start = int(indices_j[0]) if len(indices_j) else 0
-
-                for local_j, j in enumerate(indices_j):
-
-                    j = int(j)
-
-                    if same_group and j <= i:
-                        continue
-
-                    name_j = current_names[j]
-                    sha_j = current_sha256[name_j]
-
-                    value = get_cached_distance(
-                        i,
-                        j,
-                        name_i,
-                        name_j,
-                        sha_i,
-                        sha_j
-                    )
-
-                    if value is not None:
-
-                        D[i, j] = value
-                        D[j, i] = value
-                        block_done_pairs[key] += 1
-
-                    else:
-
-                        missing_pairs.append(
-                            (local_i, local_j, i, j)
-                        )
-
-            # --------------------------------------------------
-            # 新規距離がなければCDFを作らず終了。
-            # --------------------------------------------------
-
-            if not missing_pairs:
-
-                render_block_progress(gi, gj)
-                del indices_j
-                continue
-
-            # --------------------------------------------------
-            # i側CDFは最初に必要になった時だけ作る。
-            # --------------------------------------------------
-
-            if cdf_i is None:
-
-                cdf_i, _ = get_cdf_for_indices(
-                    indices_i
-                )
-
-            # --------------------------------------------------
-            # j側CDFをこのj-blockについて一度だけ作る。
-            # --------------------------------------------------
-
-            # i-blockとj-blockが完全に同じ場合は、
-            # cdf_iそのものを使う。
-            same_cdf_block = (
-                same_group
-                and block_i_start == block_j_start
-                and block_i_end == block_j_end
-            )
-
-            if same_cdf_block:
-
-                cdf_j = cdf_i
-
-            else:
-
-                cdf_j, _ = get_cdf_for_indices(
-                    indices_j
-                )
-
-            # --------------------------------------------------
-            # CDF同士からmissing pairだけ計算。
-            # 16×16×524289の巨大な3次元差分配列は作らない。
-            # --------------------------------------------------
-
-            for local_i, local_j, i, j in missing_pairs:
-
-                value = wasserstein_distance_from_cdf(
-                    cdf_i[local_i],
-                    cdf_j[local_j],
-                    df
-                )
-
-                D[i, j] = value
-                D[j, i] = value
-
-                new_distance_count += 1
-                block_done_pairs[key] += 1
-
-            # --------------------------------------------------
-            # j側CDFはこのj-block終了時に破棄。
-            # incremental cacheそのものは保持される。
-            # --------------------------------------------------
-
-            if not same_cdf_block:
-                del cdf_j
-
-            render_block_progress(gi, gj)
-
-            del indices_j
-
-        # --------------------------------------------------
-        # このi-blockについて全j-blockが終わった。
-        # ここで初めてi側CDFを破棄する。
-        # --------------------------------------------------
-
-        if cdf_i is not None:
-            del cdf_i
-
-        del indices_i
-
-    render_block_progress(gi, gj)
-
-
-# ==================================================
-# 全group pair
-# ==================================================
-
-for gi in range(GROUP_COUNT):
-
-    start_i = group_starts[gi]
-    size_i = group_sizes[gi]
-    end_i = start_i + size_i
-
-    for gj in range(gi, GROUP_COUNT):
-
-        start_j = group_starts[gj]
-        size_j = group_sizes[gj]
-        end_j = start_j + size_j
-
-        key = (gi, gj)
-
-        block_done_pairs[key] = 0
-
-        calculate_block_pair(
-            gi,
-            gj,
-            start_i,
-            end_i,
-            start_j,
-            end_j
-        )
-
-        print()
-
-
-# ==================================================
-# 新規CDFキャッシュ解放
-# ==================================================
-
-new_cdf_cache.clear()
-
-# ==================================================
-# RAW NPY保存
-# ==================================================
-
-D.flush()
-
-
-if os.path.exists(
-    RAW_NPY
-):
-
-    try:
-
-        os.remove(
-            RAW_NPY
-        )
-
-    except PermissionError:
-
-        raise RuntimeError(
-            "Could not replace existing "
-            "distance_matrix_raw.npy."
-        )
-
-
-os.replace(
-    RAW_TMP_NPY,
-    RAW_NPY
-)
-
-
-D = np.load(
-    RAW_NPY,
-    mmap_mode="r+"
-)
-
-
-# ==================================================
-# RAW CSV
-# ==================================================
-
-print()
-print(
-    "Writing raw distance CSV..."
-)
-
-
-with open(
-    RAW_CSV,
-    "w",
-    encoding="utf-8",
-    newline=""
-) as f:
-
-    writer = csv.writer(
-        f
-    )
-
-    writer.writerow(
-        [""] + current_names
-    )
-
-    for i in range(
-        N
-    ):
-
-        row = np.asarray(
-            D[i, :],
-            dtype=np.float64
-        )
-
-        writer.writerow(
-            [current_names[i]]
-            + row.tolist()
-        )
-
-        if (
-            (i + 1) % 20 == 0
-            or i + 1 == N
-        ):
-
-            print(
-                f"\r  raw CSV: "
-                f"{i + 1}/{N}",
+                f"\r  spectra: {k}/{len(todo)}",
                 end="",
                 flush=True
             )
 
-print()
-
-
-# ==================================================
-# 正規化
-# ==================================================
-
-if NORMALIZE_DISTANCE_MATRIX:
-
-    print()
-    print(
-        "Normalizing distance matrix..."
-    )
-
-    d_min = float(
-        np.min(D)
-    )
-
-    d_max = float(
-        np.max(D)
-    )
-
-    normalized_D = (
-        np.lib.format.open_memmap(
-            NORMALIZED_NPY,
-            mode="w+",
-            dtype=np.float64,
-            shape=(
-                N,
-                N
-            )
-        )
-    )
-
-    if d_max == d_min:
-
-        normalized_D[
-            :, :
-        ] = 0.0
-
-    else:
-
-        scale = (
-            d_max - d_min
-        )
-
-        for i in range(
-            N
-        ):
-
-            normalized_D[
-                i, :
-            ] = (
-                D[i, :]
-                - d_min
-            ) / scale
-
-            if (
-                (i + 1) % 20 == 0
-                or i + 1 == N
-            ):
-
-                print(
-                    f"\r  normalize: "
-                    f"{i + 1}/{N}",
-                    end="",
-                    flush=True
-                )
+    if todo:
 
         print()
 
-    normalized_D.flush()
 
-    # ----------------------------------------------
-    # normalized CSV
-    # ----------------------------------------------
+def validate_spectra(current_files, current_sha256):
+    """全スペクトルの形状・dtypeを(ヘッダだけ読んで)確認する。"""
 
-    print()
-    print(
-        "Writing normalized distance CSV..."
+    lengths = {}
+    bad = []
+    seen = set()
+
+    for item in current_files:
+
+        name = item["relative_name"]
+        sha = current_sha256[name]
+
+        if sha in seen:
+
+            continue
+
+        seen.add(sha)
+
+        try:
+
+            arr = np.load(
+                spectrum_path(sha),
+                mmap_mode="r",
+                allow_pickle=False
+            )
+
+            if arr.ndim != 1 or arr.dtype != np.float32:
+
+                raise ValueError("unexpected shape/dtype")
+
+            lengths.setdefault(int(arr.shape[0]), []).append(name)
+
+            del arr
+
+        except Exception:
+
+            bad.append(sha)
+
+    return lengths, bad
+
+
+def load_cdf_rows(
+    indices,
+    current_shas,
+    current_names,
+    spectrum_len,
+    weight,
+    k0=0
+):
+    """
+    指定ファイルのCDFを (本数, L-k0) のfloat64で返す。
+    k0 > 0 のときはビン k0 未満を捨て、残りを総和1に再正規化したCDFにする。
+    重み(積分の刻み幅)を掛け済みなので、あとは cdist で距離が出る。
+    """
+
+    width = spectrum_len - k0
+
+    out = np.empty((len(indices), width), dtype=np.float64)
+
+    scratch = np.empty(spectrum_len, dtype=np.float64) if k0 > 0 else None
+
+    for k, gi in enumerate(indices):
+
+        gi = int(gi)
+
+        sha = current_shas[gi]
+        name = current_names[gi]
+
+        try:
+
+            row = np.load(spectrum_path(sha), allow_pickle=False)
+
+        except (OSError, ValueError, EOFError) as e:
+
+            raise CorruptSpectrum(sha, name, f"cannot read: {e}")
+
+        if row.shape != (spectrum_len,):
+
+            raise CorruptSpectrum(sha, name, f"bad shape {row.shape}")
+
+        if k0 == 0:
+
+            np.cumsum(row, dtype=np.float64, out=out[k])
+
+            end = out[k, -1]
+
+        else:
+
+            np.cumsum(row, dtype=np.float64, out=scratch)
+
+            end = scratch[-1]
+
+        # 正しいスペクトルなら総和≒1。ゼロ行・欠損・NaNはここで必ず落ちる。
+        if not (0.99 < end < 1.01):
+
+            raise CorruptSpectrum(sha, name, f"CDF end = {end!r}")
+
+        if k0 > 0:
+
+            base = scratch[k0 - 1]
+
+            kept = end - base
+
+            if not kept > 1e-6:
+
+                raise CorruptSpectrum(
+                    sha,
+                    name,
+                    f"almost no energy above f0 (kept mass {kept!r})"
+                )
+
+            np.subtract(scratch[k0:], base, out=out[k])
+
+            out[k] /= kept
+
+        out[k] *= weight
+
+    return out
+
+
+# ==================================================
+# 距離キャッシュ状態(1ファイル)
+# ==================================================
+
+def save_state(path, shas, D, valid, fingerprint):
+
+    def writer(f):
+
+        np.savez(
+            f,
+            shas=np.array(shas, dtype="U64"),
+            D=D,
+            valid=valid,
+            fingerprint=np.array(json.dumps(fingerprint, sort_keys=True))
+        )
+
+    atomic_write(path, writer)
+
+
+def load_state(path, fingerprint):
+    """壊れている/条件が違う場合は None(= 使わない)。"""
+
+    if not os.path.exists(path):
+
+        return None
+
+    try:
+
+        with np.load(path, allow_pickle=False) as z:
+
+            saved_fp = json.loads(str(z["fingerprint"]))
+            shas = [str(s) for s in z["shas"]]
+            D = np.array(z["D"], dtype=np.float64)
+            valid = np.array(z["valid"], dtype=bool)
+
+    except Exception as e:
+
+        print(f"WARNING: ignoring unreadable distance_state.npz: {e}")
+
+        return None
+
+    if saved_fp != fingerprint:
+
+        print(
+            "NOTE: distance_state.npz was made with different settings; "
+            "ignored."
+        )
+        print(f"  saved  : {saved_fp}")
+        print(f"  current: {fingerprint}")
+
+        return None
+
+    n = len(shas)
+
+    if D.shape != (n, n) or valid.shape != (n, n):
+
+        print("WARNING: distance_state.npz has inconsistent shapes; ignored.")
+
+        return None
+
+    # 非対称/非有限の要素は「未計算」とみなす
+    valid &= valid.T
+    valid &= np.isfinite(D)
+
+    return shas, D, valid
+
+
+def build_initial_matrices(current_shas, prior):
+    """
+    現在のファイル順の (D, valid) を作る。
+    以前の状態に同じSHA256の行があれば、その行・列の値を持ってくる(位置ではなく内容で対応)。
+    """
+
+    n = len(current_shas)
+
+    D = np.zeros((n, n), dtype=np.float64)
+    valid = np.zeros((n, n), dtype=bool)
+
+    if prior is not None:
+
+        prior_shas, prior_D, prior_valid = prior
+
+        prior_index = {}
+
+        for i, sha in enumerate(prior_shas):
+
+            prior_index.setdefault(sha, i)
+
+        new_idx = []
+        old_idx = []
+
+        for i, sha in enumerate(current_shas):
+
+            j = prior_index.get(sha)
+
+            if j is not None:
+
+                new_idx.append(i)
+                old_idx.append(j)
+
+        if new_idx:
+
+            ni = np.asarray(new_idx, dtype=np.int64)
+            oi = np.asarray(old_idx, dtype=np.int64)
+
+            D[np.ix_(ni, ni)] = prior_D[np.ix_(oi, oi)]
+            valid[np.ix_(ni, ni)] = prior_valid[np.ix_(oi, oi)]
+
+    # 内容が同一(SHA256一致)なら距離は定義上0
+    _, codes = np.unique(
+        np.asarray(current_shas),
+        return_inverse=True
     )
 
-    with open(
-        NORMALIZED_CSV,
-        "w",
-        encoding="utf-8",
-        newline=""
-    ) as f:
+    codes = codes.reshape(-1)
 
-        writer = csv.writer(
-            f
-        )
+    same = codes[:, None] == codes[None, :]
 
-        writer.writerow(
-            [""] + current_names
-        )
+    D[same] = 0.0
+    valid[same] = True
 
-        for i in range(
-            N
-        ):
+    valid &= valid.T
 
-            row = np.asarray(
-                normalized_D[i, :],
-                dtype=np.float64
+    D[~valid] = 0.0
+
+    return D, valid
+
+
+# ==================================================
+# 距離計算(未計算のペアだけ)
+# ==================================================
+
+def compute_missing_distances(
+    D,
+    valid,
+    current_shas,
+    current_names,
+    spectrum_len,
+    weight,
+    k0,
+    metric,
+    state_path,
+    fingerprint
+):
+
+    n = len(current_shas)
+    block = CDF_BLOCK_SIZE
+
+    total = int(np.count_nonzero(~valid)) // 2
+
+    if total == 0:
+
+        print("  all distances are already cached.")
+
+        return 0
+
+    print(f"  pairs to compute: {total}")
+
+    done = 0
+    t_start = time.time()
+    t_ckpt = t_start
+
+    try:
+
+        for bi in range(0, n, block):
+
+            ei = min(bi + block, n)
+
+            row_missing = ~valid[bi:ei, bi:].all(axis=1)
+
+            if not row_missing.any():
+
+                continue
+
+            need_rows = np.flatnonzero(row_missing)
+
+            row_pos = np.full(ei - bi, -1, dtype=np.int64)
+            row_pos[need_rows] = np.arange(len(need_rows))
+
+            cdf_i = load_cdf_rows(
+                bi + need_rows,
+                current_shas,
+                current_names,
+                spectrum_len,
+                weight,
+                k0
             )
 
-            writer.writerow(
-                [current_names[i]]
-                + row.tolist()
+            for bj in range(bi, n, block):
+
+                ej = min(bj + block, n)
+
+                missing = ~valid[bi:ei, bj:ej]
+
+                if bj == bi:
+
+                    # 対角タイルは上三角だけ計算して鏡映する
+                    missing = np.triu(missing, 1)
+
+                if not missing.any():
+
+                    continue
+
+                rows = np.flatnonzero(missing.any(axis=1))
+                cols = np.flatnonzero(missing.any(axis=0))
+
+                a = cdf_i[row_pos[rows]]
+
+                if bj == bi:
+
+                    pos = row_pos[cols]
+
+                    if (pos < 0).any():
+
+                        raise RuntimeError(
+                            "internal error: asymmetric validity mask"
+                        )
+
+                    b = cdf_i[pos]
+
+                else:
+
+                    b = load_cdf_rows(
+                        bj + cols,
+                        current_shas,
+                        current_names,
+                        spectrum_len,
+                        weight,
+                        k0
+                    )
+
+                sub = cdist(a, b, metric=metric)
+
+                ii, jj = np.nonzero(missing)
+
+                values = sub[
+                    np.searchsorted(rows, ii),
+                    np.searchsorted(cols, jj)
+                ]
+
+                gi = bi + ii
+                gj = bj + jj
+
+                D[gi, gj] = values
+                D[gj, gi] = values
+                valid[gi, gj] = True
+                valid[gj, gi] = True
+
+                done += len(ii)
+
+                del a, b, sub
+
+            del cdf_i
+
+            elapsed = time.time() - t_start
+
+            rate = done / elapsed if elapsed > 0 else 0.0
+
+            eta = (total - done) / rate if rate > 0 else float("nan")
+
+            print(
+                f"\r  distances: {done}/{total} "
+                f"({100.0 * done / total:5.1f}%) "
+                f"ETA {eta / 60:6.1f} min   ",
+                end="",
+                flush=True
             )
 
-            if (
-                (i + 1) % 20 == 0
-                or i + 1 == N
-            ):
+            if time.time() - t_ckpt >= CHECKPOINT_SECONDS:
+
+                save_state(state_path, current_shas, D, valid, fingerprint)
+
+                t_ckpt = time.time()
+
+    except BaseException:
+
+        # Ctrl-Cや例外のときも、ここまでの計算結果は残す
+        # (OOM killなどSIGKILLのときは定期チェックポイントが効く)。
+        try:
+
+            save_state(state_path, current_shas, D, valid, fingerprint)
+
+        except Exception:
+
+            pass
+
+        raise
+
+    print()
+
+    return done
+
+
+# ==================================================
+# 自己検証(キャッシュを使わずwavから計算し直して照合)
+# ==================================================
+
+def reference_distance(spec_a, spec_b, order, use_log, df, dx_eff, k0):
+    """cdistを使わない素朴な参照実装(float32保存値 -> k0未満を捨てて再正規化 -> float64 CDF)。"""
+
+    sa = np.asarray(spec_a, dtype=np.float64)[k0:]
+    sb = np.asarray(spec_b, dtype=np.float64)[k0:]
+
+    fa = np.cumsum(sa / np.sum(sa))
+    fb = np.cumsum(sb / np.sum(sb))
+
+    diff = np.abs(fa - fb)
+
+    if order == 1:
+
+        if use_log:
+
+            return float(np.sum(diff * dx_eff))
+
+        return float(np.sum(diff) * df)
+
+    if use_log:
+
+        return float(np.sqrt(np.sum(diff ** 2 * dx_eff)))
+
+    return float(np.sqrt(np.sum(diff ** 2) * df))
+
+
+def verify_random_files(
+    current_files,
+    current_shas,
+    D,
+    order,
+    use_log,
+    df,
+    dx_eff,
+    k0
+):
+
+    n = len(current_files)
+
+    k = min(VERIFY_FILES, n)
+
+    if k <= 0:
+
+        return
+
+    rng = np.random.default_rng()
+
+    picked = sorted(int(i) for i in rng.choice(n, size=k, replace=False))
+
+    print()
+    print(f"Verifying {k} random file(s) against fresh wav computation...")
+
+    fresh = {}
+
+    for i in picked:
+
+        spec = compute_spectrum_distribution(
+            current_files[i]["path"]
+        ).astype(np.float32)
+
+        cached = np.load(spectrum_path(current_shas[i]))
+
+        err = float(
+            np.sum(
+                np.abs(
+                    spec.astype(np.float64) - cached.astype(np.float64)
+                )
+            )
+        )
+
+        if err > 1e-5:
+
+            raise RuntimeError(
+                "VERIFY FAILED: cached spectrum differs from fresh "
+                f"computation: {current_files[i]['relative_name']} "
+                f"(L1 diff {err:.3e}). "
+                "Set REBUILD_CACHE=True and run again."
+            )
+
+        fresh[i] = spec
+
+    others = [i for i in range(n) if i not in fresh]
+
+    if others:
+
+        extra = rng.choice(others, size=min(10, len(others)), replace=False)
+
+    else:
+
+        extra = []
+
+    checked = 0
+    worst = 0.0
+
+    def check(i, j, spec_i, spec_j):
+
+        nonlocal checked, worst
+
+        ref = reference_distance(spec_i, spec_j, order, use_log, df, dx_eff, k0)
+
+        got = float(D[i, j])
+
+        rel = abs(ref - got) / max(abs(ref), 1e-300)
+
+        worst = max(worst, rel)
+
+        checked += 1
+
+        if rel > 1e-7 and abs(ref - got) > 1e-12:
+
+            raise RuntimeError(
+                "VERIFY FAILED: "
+                f"D[{current_files[i]['relative_name']}, "
+                f"{current_files[j]['relative_name']}] = {got!r}, "
+                f"recomputed = {ref!r}"
+            )
+
+    for a_pos, i in enumerate(picked):
+
+        for j in picked[a_pos + 1:]:
+
+            check(i, j, fresh[i], fresh[j])
+
+        for j in extra:
+
+            j = int(j)
+
+            check(i, j, fresh[i], np.load(spectrum_path(current_shas[j])))
+
+    print(
+        f"  OK: {checked} pair(s) match "
+        f"(worst relative error {worst:.2e})"
+    )
+
+
+# ==================================================
+# 出力(エクスポート)。キャッシュとしては読み戻さない。
+# ==================================================
+
+def write_matrix_csv(path, names, matrix):
+
+    def writer(f):
+
+        w = csv.writer(f)
+
+        w.writerow([""] + names)
+
+        for i in range(len(names)):
+
+            w.writerow([names[i]] + np.asarray(matrix[i], dtype=np.float64).tolist())
+
+    atomic_write(path, writer, text=True)
+
+
+def export_spectra_npy(path, current_shas, spectrum_len):
+    """spectra.npy(N x L, float32)を1行ずつ書き出す。メモリマップは使わない。"""
+
+    n = len(current_shas)
+
+    def writer(f):
+
+        header = {
+            "descr": np.lib.format.dtype_to_descr(np.dtype("<f4")),
+            "fortran_order": False,
+            "shape": (n, spectrum_len),
+        }
+
+        np.lib.format.write_array_header_1_0(f, header)
+
+        for k, sha in enumerate(current_shas):
+
+            row = np.load(spectrum_path(sha), allow_pickle=False)
+
+            f.write(np.ascontiguousarray(row, dtype="<f4").tobytes())
+
+            if (k + 1) % 100 == 0 or k + 1 == n:
 
                 print(
-                    f"\r  normalized CSV: "
-                    f"{i + 1}/{N}",
+                    f"\r  spectra.npy: {k + 1}/{n}",
                     end="",
                     flush=True
                 )
 
+    atomic_write(path, writer)
+
     print()
 
-    del normalized_D
-
 
 # ==================================================
-# 不要になったmemmapを解放
+# メイン
 # ==================================================
 
-del D
-del spectra
+def main():
+
+    started = time.time()
+
+    order, use_log = parse_wasserstein_mode(WASSERSTEIN_MODE)
+
+    metric = "cityblock" if order == 1 else "euclidean"
+
+    out_dir = OUT_DIR
+    root_abs = os.path.abspath(ROOT_DIR)
+    out_abs = os.path.abspath(out_dir)
+
+    os.makedirs(out_dir, exist_ok=True)
+
+    p_state = os.path.join(out_dir, "distance_state.npz")
+    p_raw_npy = os.path.join(out_dir, "distance_matrix_raw.npy")
+    p_raw_csv = os.path.join(out_dir, "distance_matrix_raw.csv")
+    p_norm_npy = os.path.join(out_dir, "distance_matrix_normalized.npy")
+    p_norm_csv = os.path.join(out_dir, "distance_matrix_normalized.csv")
+    p_spectra_npy = os.path.join(out_dir, "spectra.npy")
+    p_freqs = os.path.join(out_dir, "freqs.npy")
+    p_file_info = os.path.join(out_dir, "file_info.csv")
+    p_group_info = os.path.join(out_dir, "group_info.csv")
+    p_sha_json = os.path.join(out_dir, "sha256_cache.json")
+    p_display = os.path.join(out_dir, "display_groups.json")
+    p_manifest = os.path.join(out_dir, "export_manifest.json")
+
+    # ------------------------------------------------
+    # 前回クラッシュの残骸(一時ファイル)を掃除
+    # ------------------------------------------------
+
+    cleanup_stale_tmp(out_dir)
+
+    if os.path.isdir(SPECTRA_CACHE_ROOT):
+
+        cleanup_stale_tmp(SPECTRA_CACHE_ROOT)
+
+    # ------------------------------------------------
+    # REBUILD_CACHE: このスクリプトのキャッシュを破棄
+    # ------------------------------------------------
+
+    if REBUILD_CACHE:
+
+        import shutil
+
+        print()
+        print("REBUILD_CACHE=True: discarding cached spectra and distance state.")
+
+        if os.path.isdir(spectra_dir()):
+
+            shutil.rmtree(spectra_dir())
+
+        if os.path.exists(p_state):
+
+            os.remove(p_state)
+
+        print(
+            "  (If this run is interrupted, set REBUILD_CACHE=False and "
+            "run again to resume from what was already built.)"
+        )
+
+    # ------------------------------------------------
+    # WAV探索
+    # ------------------------------------------------
+
+    current_files = []
+
+    for group_name in TARGET_DIRS:
+
+        group_dir = os.path.join(ROOT_DIR, group_name)
+
+        if not os.path.isdir(group_dir):
+
+            print(f"WARNING: directory not found: {group_dir}")
+
+            continue
+
+        filenames = sorted(
+            filename
+            for filename in os.listdir(group_dir)
+            if filename.lower().endswith(".wav")
+        )
+
+        for filename in filenames:
+
+            file_path = os.path.join(group_dir, filename)
+
+            if is_path_inside(file_path, out_abs):
+
+                continue
+
+            if KEYWORD and KEYWORD not in filename:
+
+                continue
+
+            current_files.append(
+                {
+                    "group_name": group_name,
+                    "filename": filename,
+                    "relative_name": f"{group_name}/{filename}",
+                    "path": file_path,
+                }
+            )
+
+    if len(current_files) == 0:
+
+        raise RuntimeError("No WAV files were found.")
+
+    N = len(current_files)
+
+    current_names = [item["relative_name"] for item in current_files]
+
+    print()
+    print(f"Current WAV files: {N}")
+
+    # ------------------------------------------------
+    # SHA256(毎回、実ファイルの中身から計算する)
+    # ------------------------------------------------
+
+    print()
+    print("Calculating SHA256...")
+
+    current_sha256 = {}
+
+    for i, item in enumerate(current_files):
+
+        current_sha256[item["relative_name"]] = compute_sha256(item["path"])
+
+        if (i + 1) % 50 == 0 or i + 1 == N:
+
+            print(f"\r  SHA256: {i + 1}/{N}", end="", flush=True)
+
+    print()
+
+    current_shas = [current_sha256[name] for name in current_names]
+
+    # ------------------------------------------------
+    # スペクトル(SHA256ごとにキャッシュ)
+    # ------------------------------------------------
+
+    ensure_spectra(current_files, current_sha256)
+
+    lengths, bad = validate_spectra(current_files, current_sha256)
+
+    if bad:
+
+        print(
+            f"WARNING: {len(bad)} cached spectrum file(s) are unreadable; "
+            "recomputing them."
+        )
+
+        for sha in bad:
+
+            try:
+
+                os.remove(spectrum_path(sha))
+
+            except OSError:
+
+                pass
+
+        ensure_spectra(current_files, current_sha256)
+
+        lengths, bad = validate_spectra(current_files, current_sha256)
+
+        if bad:
+
+            raise RuntimeError(
+                f"{len(bad)} spectrum file(s) could not be created."
+            )
+
+    if len(lengths) != 1:
+
+        lines = []
+
+        for length, names in sorted(lengths.items()):
+
+            lines.append(
+                f"  length {length}: {len(names)} file(s), e.g. "
+                + ", ".join(names[:3])
+            )
+
+        raise RuntimeError(
+            "Spectrum lengths differ between files. "
+            "All wav files must have the same length after resampling.\n"
+            + "\n".join(lines)
+        )
+
+    L = next(iter(lengths))
+
+    print()
+    print(f"Spectrum length: {L}")
+
+    # ------------------------------------------------
+    # 周波数軸・積分の刻み幅
+    # ------------------------------------------------
+
+    freqs = np.linspace(0, TARGET_SR / 2, L, dtype=np.float64)
+
+    df = float(freqs[1] - freqs[0]) if L > 1 else 1.0
+
+    if use_log:
+
+        if not LOG_F0_HZ > 0:
+
+            raise ValueError("LOG_F0_HZ must be > 0 for log-axis modes.")
+
+        # f0 以上のビンだけを使う(DC=0Hzは常に除外)
+        k0 = max(1, int(np.searchsorted(freqs, LOG_F0_HZ, side="left")))
+
+        if L - k0 < 2:
+
+            raise ValueError("LOG_F0_HZ is too high: fewer than 2 bins remain.")
+
+        x = np.log2(freqs[k0:] / LOG_F0_HZ)
+
+        dx_eff = np.diff(x)
+        dx_eff = np.append(dx_eff, dx_eff[-1])
+
+        w = dx_eff
+
+        print()
+        print(
+            f"Log axis: x = lb(f / {LOG_F0_HZ:g} Hz); "
+            f"dropping bins 0..{k0 - 1} (< {freqs[k0]:.4f} Hz), "
+            f"using {L - k0} of {L} bins"
+        )
+
+    else:
+
+        k0 = 0
+        dx_eff = None
+        w = df
+
+    # L1: sum |dF| * w          -> cityblock( F*w )
+    # L2: sqrt( sum dF^2 * w )  -> euclidean( F*sqrt(w) )
+    weight = w if order == 1 else np.sqrt(w)
+
+    # ------------------------------------------------
+    # 距離キャッシュ状態の読み込み(内容=SHA256で対応付け)
+    # ------------------------------------------------
+
+    fingerprint = {
+        "code_version": CODE_VERSION,
+        "target_sr": TARGET_SR,
+        "order": order,
+        "log_axis": bool(use_log),
+        "spectrum_len": int(L),
+    }
+
+    if use_log:
+
+        # 軸の定義: x = lb(f / f0)、f0未満を捨てて再正規化。
+        # 旧版の x = lb(f + 1) で作った状態とはこのキーの有無で区別され、自動的に使われなくなる。
+        fingerprint["log_f0_hz"] = float(LOG_F0_HZ)
+        fingerprint["log_k0"] = int(k0)
+
+    prior = None if REBUILD_CACHE else load_state(p_state, fingerprint)
+
+    D, valid = build_initial_matrices(current_shas, prior)
+
+    reused_pairs = (int(np.count_nonzero(valid)) - N) // 2
+
+    print()
+    print("Distance matrix:")
+    print(f"  reused pairs (cache / identical content): {reused_pairs}")
+
+    # ------------------------------------------------
+    # 距離計算
+    # ------------------------------------------------
+
+    new_pairs = 0
+
+    for attempt in range(2):
+
+        try:
+
+            new_pairs = compute_missing_distances(
+                D,
+                valid,
+                current_shas,
+                current_names,
+                L,
+                weight,
+                k0,
+                metric,
+                p_state,
+                fingerprint
+            )
+
+            break
+
+        except CorruptSpectrum as e:
+
+            print()
+            print(f"WARNING: corrupt spectrum cache: {e}")
+
+            if attempt == 1:
+
+                raise
+
+            try:
+
+                os.remove(spectrum_path(e.sha))
+
+            except OSError:
+
+                pass
+
+            ensure_spectra(current_files, current_sha256)
+
+    if not valid.all():
+
+        raise RuntimeError("internal error: some distances were not computed")
+
+    # 完成した状態を保存(次回はこれがキャッシュになる)
+    save_state(p_state, current_shas, D, valid, fingerprint)
+
+    # ------------------------------------------------
+    # 自己検証
+    # ------------------------------------------------
+
+    verify_random_files(
+        current_files,
+        current_shas,
+        D,
+        order,
+        use_log,
+        df,
+        dx_eff,
+        k0
+    )
+
+    # ------------------------------------------------
+    # ここから出力(エクスポート)。キャッシュとしては読み戻さない。
+    # ------------------------------------------------
+
+    print()
+    print("Writing outputs...")
+
+    atomic_save_npy(p_freqs, freqs)
+
+    atomic_save_npy(p_raw_npy, D)
+
+    write_matrix_csv(p_raw_csv, current_names, D)
+
+    # file_info / group_info
+    file_info_rows = []
+
+    for i, item in enumerate(current_files):
+
+        file_info_rows.append(
+            {
+                "index": i,
+                "group_index": -1,
+                "group_name": item["group_name"],
+                "filename": item["filename"],
+                "relative_name": item["relative_name"],
+                "path": item["path"],
+            }
+        )
+
+    group_info_rows = []
+
+    for group_index, group_name in enumerate(TARGET_DIRS):
+
+        indices = [
+            i
+            for i, item in enumerate(current_files)
+            if item["group_name"] == group_name
+        ]
+
+        if not indices:
+
+            continue
+
+        group_info_rows.append(
+            {
+                "group_index": group_index,
+                "group_name": group_name,
+                "size": len(indices),
+                "start": min(indices),
+                "end": max(indices),
+            }
+        )
+
+        for i in indices:
+
+            file_info_rows[i]["group_index"] = group_index
+
+    def write_dict_csv(path, rows, columns):
+
+        def writer(f):
+
+            w = csv.DictWriter(f, fieldnames=columns)
+
+            w.writeheader()
+
+            w.writerows(rows)
+
+        atomic_write(path, writer, text=True)
+
+    write_dict_csv(
+        p_file_info,
+        file_info_rows,
+        ["index", "group_index", "group_name", "filename", "relative_name", "path"]
+    )
+
+    write_dict_csv(
+        p_group_info,
+        group_info_rows,
+        ["group_index", "group_name", "size", "start", "end"]
+    )
+
+    atomic_save_json(p_sha_json, current_sha256)
+
+    if not os.path.exists(p_display):
+
+        atomic_save_json(
+            p_display,
+            [
+                {
+                    "group_name": row["group_name"],
+                    "group_index": row["group_index"],
+                }
+                for row in group_info_rows
+            ]
+        )
+
+    if NORMALIZE_DISTANCE_MATRIX:
+
+        d_min = float(np.min(D))
+        d_max = float(np.max(D))
+
+        if d_max == d_min:
+
+            normalized = np.zeros_like(D)
+
+        else:
+
+            normalized = (D - d_min) / (d_max - d_min)
+
+        atomic_save_npy(p_norm_npy, normalized)
+
+        write_matrix_csv(p_norm_csv, current_names, normalized)
+
+        del normalized
+
+    if EXPORT_SPECTRA_NPY:
+
+        export_spectra_npy(p_spectra_npy, current_shas, L)
+
+    # 最後に「この出力一式が完成した」ことを示すマニフェストを書く。
+    digest = hashlib.sha256(
+        "\n".join(
+            f"{name}\t{sha}" for name, sha in zip(current_names, current_shas)
+        ).encode("utf-8")
+    ).hexdigest()
+
+    atomic_save_json(
+        p_manifest,
+        {
+            "complete": True,
+            "finished_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "n_files": N,
+            "spectrum_bins": int(L),
+            "wasserstein_mode": WASSERSTEIN_MODE,
+            "fingerprint": fingerprint,
+            "files_digest": digest,
+            "spectra_npy_exported": bool(EXPORT_SPECTRA_NPY),
+        }
+    )
+
+    # ------------------------------------------------
+    # 任意: 使われなくなったスペクトルキャッシュの整理
+    # ------------------------------------------------
+
+    keep = {spectrum_path(sha) for sha in current_shas}
+
+    unused = []
+
+    if os.path.isdir(spectra_dir()):
+
+        for dirpath, _, filenames in os.walk(spectra_dir()):
+
+            for filename in filenames:
+
+                path = os.path.join(dirpath, filename)
+
+                if filename.endswith(".npy") and path not in keep:
+
+                    unused.append(path)
+
+    if unused:
+
+        if PRUNE_UNUSED_SPECTRA:
+
+            for path in unused:
+
+                try:
+
+                    os.remove(path)
+
+                except OSError:
+
+                    pass
+
+            print(f"Pruned {len(unused)} unused cached spectrum file(s).")
+
+        else:
+
+            print(
+                f"NOTE: {len(unused)} cached spectrum file(s) are not used by "
+                "the current file set (PRUNE_UNUSED_SPECTRA=True to delete)."
+            )
+
+    # ------------------------------------------------
+    # 完了表示
+    # ------------------------------------------------
+
+    print()
+    print("=" * 60)
+    print("Completed.")
+    print("=" * 60)
+    print(f"Files                 : {N}")
+    print(f"Spectrum bins         : {L}")
+    print(f"Wasserstein mode      : {WASSERSTEIN_MODE}")
+    print(f"Reused pairs          : {reused_pairs}")
+    print(f"New pairs computed    : {new_pairs}")
+    print(f"Elapsed               : {(time.time() - started) / 60:.1f} min")
+    print()
+    print(f"Raw NPY               : {p_raw_npy}")
+    print(f"Raw CSV               : {p_raw_csv}")
+    print(f"File info             : {p_file_info}")
+    print(f"Group info            : {p_group_info}")
+    print(f"Distance state        : {p_state}")
+    print(f"Spectra cache         : {spectra_dir()}")
+    print()
 
 
-# ==================================================
-# 完了表示
-# ==================================================
+if __name__ == "__main__":
 
-print()
-print(
-    "=" * 60
-)
-
-print(
-    "Completed."
-)
-
-print(
-    "=" * 60
-)
-
-print(
-    f"Files                 : {N}"
-)
-
-print(
-    f"Spectrum bins         : {min_len}"
-)
-
-print(
-    f"Wasserstein mode      : "
-    f"{WASSERSTEIN_MODE}"
-)
-
-print(
-    f"Distance method       : "
-    f"CDF integral"
-)
-
-print(
-    f"CDF chunk size        : "
-    f"{CDF_CHUNK_SIZE}"
-)
-
-print(
-    f"Cache hit (name)      : "
-    f"{cache_hit_name}"
-)
-
-print(
-    f"Cache hit (SHA/rename): "
-    f"{cache_hit_hash}"
-)
-
-print(
-    f"Zero distance         : "
-    f"{zero_distance_count}"
-)
-
-print(
-    f"New calculations      : "
-    f"{new_distance_count}"
-)
-
-print()
-print(
-    f"Raw NPY               : "
-    f"{RAW_NPY}"
-)
-
-print(
-    f"Raw CSV               : "
-    f"{RAW_CSV}"
-)
-
-print(
-    f"Spectra NPY           : "
-    f"{SPECTRA_NPY}"
-)
-
-print(
-    f"File info             : "
-    f"{FILE_INFO_CSV}"
-)
-
-print(
-    f"Group info            : "
-    f"{GROUP_INFO_CSV}"
-)
-
-print(
-    f"SHA256 cache          : "
-    f"{SHA256_CACHE_JSON}"
-)
-
-print()
+    main()

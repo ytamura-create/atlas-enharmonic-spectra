@@ -10,12 +10,14 @@ import seaborn as sns
 # 設定
 # ==================================================
 
+WASSERSTEIN_MODE = "lbL2_f0-20Hz"
+
 DISTANCE_MATRIX = (
-    "./distanceMatrix_L1/"
+    f"./distanceMatrix_{WASSERSTEIN_MODE}/"
     "distance_matrix_raw.csv"
 )
 
-OUT_DIR = "./colormap_L1"
+OUT_DIR = f"./colormap_{WASSERSTEIN_MODE}"
 
 
 # ==================================================
@@ -48,6 +50,9 @@ DISPLAY_GROUPS = [
     "fg",
     "fh_tube-F",
     "fh_tube-B",
+    "fh_bell-cuivre_tube-F",
+    "fh_bell-straightMute_tube-F",
+    "fh_bell-gestopftMute_tube-F",
     "tenortrb",
     "tenortrb_mute-straight",
     "basstrb",
@@ -67,13 +72,12 @@ DISPLAY_GROUPS = [
     "basstrb_tube-Ges",
     "basstrb_tube-D",
     "va",
-    "gauss_sigma-002.5%",
-    "gauss_FWHM-wholetone",
-    "gauss_FWHM-halftone",
-    "gauss_FWHM-quartertone",
-    "gauss_FWHM-eighthtone",
+    # "gauss_sigma-002.5%",
+    # "gauss_FWHM-wholetone",
+    # "gauss_FWHM-halftone",
+    # "gauss_FWHM-quartertone",
+    # "gauss_FWHM-eighthtone",
     "gauss_FWHM-sixteenthtone",
-    # "gauss_sigma-002.5%"
 ]
 
 

@@ -18,13 +18,19 @@ __pycache__/
 # Large generated analysis files
 # ==========================================
 
-# Cached spectra (very large)
-distanceMatrix_*/spectra.npy
-
-# Cached frequency axis
-distanceMatrix_*/freqs.npy
+# Cached state
+distanceMatrix_*/distance_state.npz
 
 # Cache files
+spectra_cache/
+
+# OLD: Cached spectra
+distanceMatrix_*/spectra.npy
+
+# OLD: Cached frequency axis
+distanceMatrix_*/freqs.npy
+
+# OLD: Cache files
 distanceMatrix_*/sha256_cache.json
 
 # ==========================================

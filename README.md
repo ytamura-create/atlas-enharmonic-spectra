@@ -28,9 +28,9 @@ It is intended as a practical resource for composition, orchestration, performan
 
 ## ✨ Features
 
-- **41 instrument categories** (woodwinds, brass, strings, reference signals, and more; continuously expanding)
+- **43 instrument categories** (woodwinds, brass, strings, reference signals, and more; continuously expanding)
 
-- **2,445 WAV recordings** (chromatic long tones; continuously expanding)
+- **2,655 WAV recordings** (chromatic long tones; continuously expanding)
 
   - Sampling rate: $f_s=96\ \mathrm{kHz}$
   - Number of samples: $N=2^{20}$
