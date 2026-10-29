@@ -1,6 +1,6 @@
 {
   "complete": true,
-  "finished_at": "2026-10-29T03:04:17",
+  "finished_at": "2026-10-29T15:49:31",
   "n_files": 2655,
   "spectrum_bins": 524289,
   "wasserstein_mode": "L2",
@@ -11,6 +11,6 @@
     "log_axis": false,
     "spectrum_len": 524289
   },
-  "files_digest": "2242fb4efb374ef8490373793afe305110cbf02e1a7e75bc85e05934ed004860",
-  "spectra_npy_exported": true
+  "files_digest": "b27bcef27bcae5e06a4ef2cef27ff5f30b4166af2ed9e758d9d247aef2bba9b6",
+  "spectra_npy_exported": false
 }

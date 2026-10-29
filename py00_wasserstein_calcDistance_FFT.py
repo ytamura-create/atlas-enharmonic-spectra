@@ -29,6 +29,10 @@ wav群 -> スペクトル分布 -> 1次元Wasserstein距離行列(CDF積分方�
   5. 読み込むスペクトルは長さとCDF終端(≈1)を毎回検査し、ゼロ行などの破損を検出する。
   6. 最後に、ランダムに選んだファイルをwavから計算し直して、行列の値と突き合わせる(自己検証)。
 
+WASSERSTEIN_MODE:
+  ""  : L1, L2, lbL1, lbL2 の4モードをすべて実行(共通部分は1回だけ計算)。
+  それ以外 : 指定した1モードだけ実行。
+
 REBUILD_CACHE:
   True  : このスクリプトのキャッシュ(スペクトルキャッシュ・distance_state.npz)を削除して全部作り直す。
           途中で落ちた場合は False に戻して再実行すると、作成済みの分から再開できる。
@@ -56,7 +60,17 @@ ROOT_DIR = os.path.expanduser("./wav/")
 
 TARGET_SR = 96000
 
-WASSERSTEIN_MODE = "L1"
+# 計算するモード。
+#   ""                            : L1, L2, lbL1, lbL2 のすべてを順に実行する
+#   "L1" / "L2" / "lbL1" / "lbL2" : そのモードだけ実行する
+#     L1 / L2     : 線形周波数軸(L1 = Wasserstein-1、L2 = CDFの差のL2)
+#     lbL1 / lbL2 : 対数軸 x = lb(f / f0)(lb = 底2の対数。単位はオクターブ)
+# 全モード実行のとき、WAV探索・SHA256・スペクトル計算は1回だけ行い、
+# モードごとに距離行列を作る。途中で落ちても、完了したモードはそのまま再利用され、
+# 未完了のモードは保存済みの進捗から再開する。
+WASSERSTEIN_MODE = ""
+
+ALL_MODES = ["L1", "L2", "lbL1", "lbL2"]
 
 # 対数軸モード("lbL1" / "lbL2")の軸は x = lb(f / f0)。
 #
@@ -66,10 +80,8 @@ WASSERSTEIN_MODE = "L1"
 # 目安: 全楽器の最低基音(バストロンボーンのペダル音 B♭0 ≈ 29 Hz)より少し下 -> 20 Hz。
 LOG_F0_HZ = 20.0
 
-OUT_DIR = (
-    f"./distanceMatrix_{WASSERSTEIN_MODE}"
-    + (f"_f0-{LOG_F0_HZ:g}Hz" if WASSERSTEIN_MODE.lower().startswith("lb") else "")
-)
+# 出力先は {OUT_DIR_PREFIX}_{モード}(対数軸モードは末尾に _f0-20Hz などが付く)。
+OUT_DIR_PREFIX = "./distanceMatrix"
 
 # スペクトルキャッシュの置き場。モード(L1/L2…)が違っても共通で使える。
 SPECTRA_CACHE_ROOT = "./spectra_cache"
@@ -130,10 +142,10 @@ REBUILD_CACHE = False
 
 # 旧版互換の spectra.npy(N x L, float32, 約4GB) を出力するか。
 # このスクリプト自身は読まない(下流の解析・描画用)。不要なら False で数分と4GB書き込みを節約。
-EXPORT_SPECTRA_NPY = True
+EXPORT_SPECTRA_NPY = False
 
 # 計算が終わった後、キャッシュ(不要になった古いスペクトル)を削除するか。
-PRUNE_UNUSED_SPECTRA = False
+PRUNE_UNUSED_SPECTRA = True
 
 
 # ==================================================
@@ -370,6 +382,49 @@ def parse_wasserstein_mode(mode):
     use_log_axis = mode_lower.startswith("lb")
 
     return order, use_log_axis
+
+
+_MODE_ALIASES = {
+    "l1": "L1",
+    "l2": "L2",
+    "lbl1": "lbL1",
+    "lbl2": "lbL2",
+    "lb1": "lbL1",
+    "lb2": "lbL2",
+}
+
+
+def canonical_mode(mode):
+
+    key = str(mode).strip().lower()
+
+    if key not in _MODE_ALIASES:
+
+        raise ValueError(
+            f"Unknown WASSERSTEIN_MODE {mode!r}. "
+            f"Use \"\" (all modes) or one of {ALL_MODES}."
+        )
+
+    return _MODE_ALIASES[key]
+
+
+def modes_to_run():
+    """WASSERSTEIN_MODE が空なら全モード、そうでなければ指定の1モード。"""
+
+    if str(WASSERSTEIN_MODE).strip() == "":
+
+        return list(ALL_MODES)
+
+    return [canonical_mode(WASSERSTEIN_MODE)]
+
+
+def out_dir_for_mode(mode):
+
+    _, use_log = parse_wasserstein_mode(mode)
+
+    suffix = f"_f0-{LOG_F0_HZ:g}Hz" if use_log else ""
+
+    return f"{OUT_DIR_PREFIX}_{mode}{suffix}"
 
 
 # ==================================================
@@ -907,8 +962,16 @@ def reference_distance(spec_a, spec_b, order, use_log, df, dx_eff, k0):
     sa = np.asarray(spec_a, dtype=np.float64)[k0:]
     sb = np.asarray(spec_b, dtype=np.float64)[k0:]
 
-    fa = np.cumsum(sa / np.sum(sa))
-    fb = np.cumsum(sb / np.sum(sb))
+    # 距離計算本体(load_cdf_rows)と同じ扱いにする: 再正規化するのは低域を捨てたとき(k0>0)だけ。
+    # k0=0 でも再正規化すると、float32保存による総和の1からのずれ(約1e-9)が
+    # 距離に約1e-7の相対差として出てしまい、正しい行列を誤って不一致と判定する。
+    if k0 > 0:
+
+        sa = sa / np.sum(sa)
+        sb = sb / np.sum(sb)
+
+    fa = np.cumsum(sa)
+    fb = np.cumsum(sb)
 
     diff = np.abs(fa - fb)
 
@@ -1090,41 +1153,92 @@ def export_spectra_npy(path, current_shas, spectrum_len):
 
 
 # ==================================================
-# メイン
+# 低域カット(対数軸)・スペクトル出力の共有
 # ==================================================
 
-def main():
+def link_or_copy_spectra_npy(path, current_shas, spectrum_len, ctx):
+    """
+    spectra.npy(約4GB)を、モードごとの出力フォルダにそれぞれ置く。
+    最初の1回だけ実際に書き出し、2回目以降は同じファイルへのハードリンク
+    (できなければコピー、それも駄目なら書き出し直し)にして、書き込みを節約する。
+    各フォルダの spectra.npy は、更新時は os.replace で別ファイルに置き換わるので、
+    リンクを共有していても他のフォルダの内容が書き換わることはない。
+    """
 
-    started = time.time()
+    path = os.path.abspath(path)
 
-    order, use_log = parse_wasserstein_mode(WASSERSTEIN_MODE)
+    src = ctx.get("spectra_npy_src")
 
-    metric = "cityblock" if order == 1 else "euclidean"
+    if src and os.path.exists(src) and os.path.abspath(src) != path:
 
-    out_dir = OUT_DIR
-    root_abs = os.path.abspath(ROOT_DIR)
-    out_abs = os.path.abspath(out_dir)
+        tmp = f"{path}{TMP_MARK}{os.getpid()}"
 
-    os.makedirs(out_dir, exist_ok=True)
+        try:
 
-    p_state = os.path.join(out_dir, "distance_state.npz")
-    p_raw_npy = os.path.join(out_dir, "distance_matrix_raw.npy")
-    p_raw_csv = os.path.join(out_dir, "distance_matrix_raw.csv")
-    p_norm_npy = os.path.join(out_dir, "distance_matrix_normalized.npy")
-    p_norm_csv = os.path.join(out_dir, "distance_matrix_normalized.csv")
-    p_spectra_npy = os.path.join(out_dir, "spectra.npy")
-    p_freqs = os.path.join(out_dir, "freqs.npy")
-    p_file_info = os.path.join(out_dir, "file_info.csv")
-    p_group_info = os.path.join(out_dir, "group_info.csv")
-    p_sha_json = os.path.join(out_dir, "sha256_cache.json")
-    p_display = os.path.join(out_dir, "display_groups.json")
-    p_manifest = os.path.join(out_dir, "export_manifest.json")
+            if os.path.exists(tmp):
 
-    # ------------------------------------------------
-    # 前回クラッシュの残骸(一時ファイル)を掃除
-    # ------------------------------------------------
+                os.remove(tmp)
 
-    cleanup_stale_tmp(out_dir)
+            os.link(src, tmp)
+
+            os.replace(tmp, path)
+
+            _fsync_dir(os.path.dirname(path))
+
+            print("  spectra.npy: hard-linked from an earlier mode")
+
+            return
+
+        except OSError:
+
+            try:
+
+                os.remove(tmp)
+
+            except OSError:
+
+                pass
+
+        try:
+
+            import shutil
+
+            def copier(f):
+
+                with open(src, "rb") as g:
+
+                    shutil.copyfileobj(g, f, 16 * 1024 * 1024)
+
+            atomic_write(path, copier)
+
+            print("  spectra.npy: copied from an earlier mode")
+
+            return
+
+        except OSError:
+
+            pass
+
+    export_spectra_npy(path, current_shas, spectrum_len)
+
+    ctx["spectra_npy_src"] = path
+
+
+# ==================================================
+# 共通の準備(WAV探索・SHA256・スペクトル)。全モードで1回だけ。
+# ==================================================
+
+def prepare_inputs(modes):
+
+    out_dirs = [out_dir_for_mode(m) for m in modes]
+    out_abs_list = [os.path.abspath(d) for d in out_dirs]
+
+    for d in out_dirs:
+
+        os.makedirs(d, exist_ok=True)
+
+        # 前回クラッシュの残骸(一時ファイル)を掃除
+        cleanup_stale_tmp(d)
 
     if os.path.isdir(SPECTRA_CACHE_ROOT):
 
@@ -1145,9 +1259,13 @@ def main():
 
             shutil.rmtree(spectra_dir())
 
-        if os.path.exists(p_state):
+        for d in out_dirs:
 
-            os.remove(p_state)
+            state = os.path.join(d, "distance_state.npz")
+
+            if os.path.exists(state):
+
+                os.remove(state)
 
         print(
             "  (If this run is interrupted, set REBUILD_CACHE=False and "
@@ -1180,7 +1298,7 @@ def main():
 
             file_path = os.path.join(group_dir, filename)
 
-            if is_path_inside(file_path, out_abs):
+            if any(is_path_inside(file_path, o) for o in out_abs_list):
 
                 continue
 
@@ -1286,13 +1404,68 @@ def main():
     print()
     print(f"Spectrum length: {L}")
 
-    # ------------------------------------------------
-    # 周波数軸・積分の刻み幅
-    # ------------------------------------------------
-
     freqs = np.linspace(0, TARGET_SR / 2, L, dtype=np.float64)
 
     df = float(freqs[1] - freqs[0]) if L > 1 else 1.0
+
+    return {
+        "current_files": current_files,
+        "current_names": current_names,
+        "current_sha256": current_sha256,
+        "current_shas": current_shas,
+        "N": N,
+        "L": L,
+        "freqs": freqs,
+        "df": df,
+    }
+
+
+# ==================================================
+# 1つのモードの距離行列を作る
+# ==================================================
+
+def run_mode(ctx, mode):
+
+    t_mode = time.time()
+
+    order, use_log = parse_wasserstein_mode(mode)
+
+    metric = "cityblock" if order == 1 else "euclidean"
+
+    current_files = ctx["current_files"]
+    current_names = ctx["current_names"]
+    current_sha256 = ctx["current_sha256"]
+    current_shas = ctx["current_shas"]
+    N = ctx["N"]
+    L = ctx["L"]
+    freqs = ctx["freqs"]
+    df = ctx["df"]
+
+    out_dir = out_dir_for_mode(mode)
+
+    os.makedirs(out_dir, exist_ok=True)
+
+    p_state = os.path.join(out_dir, "distance_state.npz")
+    p_raw_npy = os.path.join(out_dir, "distance_matrix_raw.npy")
+    p_raw_csv = os.path.join(out_dir, "distance_matrix_raw.csv")
+    p_norm_npy = os.path.join(out_dir, "distance_matrix_normalized.npy")
+    p_norm_csv = os.path.join(out_dir, "distance_matrix_normalized.csv")
+    p_spectra_npy = os.path.join(out_dir, "spectra.npy")
+    p_freqs = os.path.join(out_dir, "freqs.npy")
+    p_file_info = os.path.join(out_dir, "file_info.csv")
+    p_group_info = os.path.join(out_dir, "group_info.csv")
+    p_sha_json = os.path.join(out_dir, "sha256_cache.json")
+    p_display = os.path.join(out_dir, "display_groups.json")
+    p_manifest = os.path.join(out_dir, "export_manifest.json")
+
+    print()
+    print("#" * 60)
+    print(f"# Mode: {mode}    ->  {out_dir}")
+    print("#" * 60)
+
+    # ------------------------------------------------
+    # 周波数軸・積分の刻み幅
+    # ------------------------------------------------
 
     if use_log:
 
@@ -1314,7 +1487,6 @@ def main():
 
         w = dx_eff
 
-        print()
         print(
             f"Log axis: x = lb(f / {LOG_F0_HZ:g} Hz); "
             f"dropping bins 0..{k0 - 1} (< {freqs[k0]:.4f} Hz), "
@@ -1487,11 +1659,11 @@ def main():
 
         def writer(f):
 
-            w = csv.DictWriter(f, fieldnames=columns)
+            w_ = csv.DictWriter(f, fieldnames=columns)
 
-            w.writeheader()
+            w_.writeheader()
 
-            w.writerows(rows)
+            w_.writerows(rows)
 
         atomic_write(path, writer, text=True)
 
@@ -1543,7 +1715,7 @@ def main():
 
     if EXPORT_SPECTRA_NPY:
 
-        export_spectra_npy(p_spectra_npy, current_shas, L)
+        link_or_copy_spectra_npy(p_spectra_npy, current_shas, L, ctx)
 
     # 最後に「この出力一式が完成した」ことを示すマニフェストを書く。
     digest = hashlib.sha256(
@@ -1559,18 +1731,40 @@ def main():
             "finished_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "n_files": N,
             "spectrum_bins": int(L),
-            "wasserstein_mode": WASSERSTEIN_MODE,
+            "wasserstein_mode": mode,
             "fingerprint": fingerprint,
             "files_digest": digest,
             "spectra_npy_exported": bool(EXPORT_SPECTRA_NPY),
         }
     )
 
-    # ------------------------------------------------
-    # 任意: 使われなくなったスペクトルキャッシュの整理
-    # ------------------------------------------------
+    elapsed = time.time() - t_mode
 
-    keep = {spectrum_path(sha) for sha in current_shas}
+    print()
+    print(f"[{mode}] completed: {N} files, reused {reused_pairs} pairs, "
+          f"computed {new_pairs} pairs, {elapsed / 60:.1f} min")
+    print(f"  Raw NPY        : {p_raw_npy}")
+    print(f"  Raw CSV        : {p_raw_csv}")
+    print(f"  File info      : {p_file_info}")
+    print(f"  Group info     : {p_group_info}")
+    print(f"  Distance state : {p_state}")
+
+    return {
+        "mode": mode,
+        "out_dir": out_dir,
+        "reused_pairs": reused_pairs,
+        "new_pairs": new_pairs,
+        "elapsed": elapsed,
+    }
+
+
+# ==================================================
+# 使われなくなったスペクトルキャッシュの整理(全モード成功後に1回)
+# ==================================================
+
+def report_unused_spectra(ctx, prune_allowed):
+
+    keep = {spectrum_path(sha) for sha in ctx["current_shas"]}
 
     unused = []
 
@@ -1586,51 +1780,105 @@ def main():
 
                     unused.append(path)
 
-    if unused:
+    if not unused:
 
-        if PRUNE_UNUSED_SPECTRA:
+        return
 
-            for path in unused:
+    if PRUNE_UNUSED_SPECTRA and prune_allowed:
 
-                try:
+        for path in unused:
 
-                    os.remove(path)
+            try:
 
-                except OSError:
+                os.remove(path)
 
-                    pass
+            except OSError:
 
-            print(f"Pruned {len(unused)} unused cached spectrum file(s).")
+                pass
 
-        else:
+        print(f"Pruned {len(unused)} unused cached spectrum file(s).")
 
-            print(
-                f"NOTE: {len(unused)} cached spectrum file(s) are not used by "
-                "the current file set (PRUNE_UNUSED_SPECTRA=True to delete)."
-            )
+    else:
 
-    # ------------------------------------------------
-    # 完了表示
-    # ------------------------------------------------
+        print(
+            f"NOTE: {len(unused)} cached spectrum file(s) are not used by "
+            "the current file set (PRUNE_UNUSED_SPECTRA=True to delete)."
+        )
+
+
+# ==================================================
+# メイン
+# ==================================================
+
+def main():
+
+    started = time.time()
+
+    modes = modes_to_run()
+
+    print()
+    print("Modes to run: " + ", ".join(modes))
+
+    ctx = prepare_inputs(modes)
+
+    results = []
+    failures = []
+
+    if len(modes) == 1:
+
+        # 単一モードのときは、エラーはそのまま送出する(トレースバックを見やすくするため)
+        results.append(run_mode(ctx, modes[0]))
+
+    else:
+
+        for mode in modes:
+
+            try:
+
+                results.append(run_mode(ctx, mode))
+
+            except Exception as e:
+
+                import traceback
+
+                print()
+                print(f"!!! Mode {mode} FAILED: {type(e).__name__}: {e}")
+                traceback.print_exc()
+
+                failures.append((mode, e))
+
+    report_unused_spectra(ctx, prune_allowed=not failures)
 
     print()
     print("=" * 60)
-    print("Completed.")
+    print("Completed." if not failures else "Finished WITH FAILURES.")
     print("=" * 60)
-    print(f"Files                 : {N}")
-    print(f"Spectrum bins         : {L}")
-    print(f"Wasserstein mode      : {WASSERSTEIN_MODE}")
-    print(f"Reused pairs          : {reused_pairs}")
-    print(f"New pairs computed    : {new_pairs}")
-    print(f"Elapsed               : {(time.time() - started) / 60:.1f} min")
-    print()
-    print(f"Raw NPY               : {p_raw_npy}")
-    print(f"Raw CSV               : {p_raw_csv}")
-    print(f"File info             : {p_file_info}")
-    print(f"Group info            : {p_group_info}")
-    print(f"Distance state        : {p_state}")
+    print(f"Files                 : {ctx['N']}")
+    print(f"Spectrum bins         : {ctx['L']}")
+
+    for r in results:
+
+        print(
+            f"  {r['mode']:<5} OK    reused {r['reused_pairs']:>9}  "
+            f"new {r['new_pairs']:>9}  {r['elapsed'] / 60:6.1f} min  {r['out_dir']}"
+        )
+
+    for mode, e in failures:
+
+        print(f"  {mode:<5} FAILED {type(e).__name__}: {e}")
+
     print(f"Spectra cache         : {spectra_dir()}")
+    print(f"Elapsed (total)       : {(time.time() - started) / 60:.1f} min")
     print()
+
+    if failures:
+
+        print(
+            "Re-run the script: finished modes are reused as they are, and "
+            "failed modes resume from their saved progress."
+        )
+
+        sys.exit(1)
 
 
 if __name__ == "__main__":
