@@ -32,11 +32,11 @@ Es dient als praktisches Hilfsmittel für Komposition, Instrumentation, Aufführ
 
 - **2.655 WAV-Aufnahmen** (chromatische Langtöne; fortlaufend erweitert)
 
-  - Abtastrate: $f_s=96\ \mathrm{kHz}$
+  - Abtastrate: $f_{\text s}=96\ \mathrm{kHz}$
 
   - Anzahl der Samples: $N=2^{20}$
 
-  - Standardisierte Dauer: $N/f_s=10.922666\ldots\ \mathrm{sec}$
+  - Standardisierte Dauer: $N/f_{\text s}=10.922666\ldots\ \mathrm{sec}$
 
   - Siehe [*Sparse FFT: A New High-Resolution Frequency Analysis and Its Applications*](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/).
 
@@ -85,6 +85,33 @@ Je nach Instrument können Dateinamen folgende Informationen enthalten:
 - Position oder Griff (`pos-*`)
 - Dämpfertyp (`mute-*`)
 - weitere Spielbedingungen
+
+## 🐑 Klonen (≈ Herunterladen)
+
+Führen Sie eines der folgenden Befehle im übergeordneten Verzeichnis aus, in dem das Repository gespeichert werden soll.
+
+### Wenn WAV-Dateien (Audioaufnahmen) NICHT benötigt werden
+
+```bash
+git clone --filter=blob:none --no-checkout \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+
+cd atlas-enharmonic-spectra
+
+git sparse-checkout init --no-cone
+git sparse-checkout set '/*' '!/wav/'
+
+git checkout
+```
+
+Das Verzeichnis `wav/` wird beim Checkout ausgeschlossen. Alle übrigen Dateien und Verzeichnisse werden heruntergeladen. CSV-Dateien (Distanzmatrizen) und andere mit Git LFS verwaltete Dateien werden weiterhin wie gewohnt heruntergeladen.
+
+### Wenn WAV-Dateien (Audioaufnahmen) benötigt werden
+
+```bash
+git clone \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+```
 
 ## ▶️ Ausführungsablauf
 

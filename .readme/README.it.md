@@ -38,9 +38,9 @@ Oltre a registrazioni standardizzate che coprono l'intera estensione pratica dei
 
 - **43 categorie di strumenti** (legni, ottoni, archi, segnali di riferimento e altro; il dataset verrà ampliato progressivamente).
 - **2655 registrazioni WAV** di note lunghe cromatiche (il dataset verrà ampliato progressivamente).
-  - Frequenza di campionamento: $f_s=96\ \mathrm{kHz}$.
+  - Frequenza di campionamento: $f_{\text s}=96\ \mathrm{kHz}$.
   - Numero di campioni: $N=2^{20}$.
-  - Di conseguenza, la durata dei dati è uniformata a $N/f_s=10.922666\ldots\ \mathrm{sec}$.
+  - Di conseguenza, la durata dei dati è uniformata a $N/f_{\text s}=10.922666\ldots\ \mathrm{sec}$.
   - Si veda [*Sparse FFT: nuova analisi in frequenza ad alta risoluzione e sue applicazioni*](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/).
 - Convenzione uniforme di denominazione dei file, comprendente altezza scritta, altezza reale e condizioni esecutive.
 - Script per il calcolo delle distanze di Wasserstein L1 e L2 tra spettri.
@@ -66,6 +66,33 @@ atlas-enharmonic-spectra/
 ```
 
 Ogni directory degli strumenti contiene registrazioni di note lunghe su tutta la scala cromatica. Per alcuni strumenti sono incluse anche varianti relative a diteggiature alternative, sordine e altre condizioni esecutive.
+
+## 🐑 Clonazione (≈ Download)
+
+Eseguire uno dei seguenti comandi nella directory padre in cui si desidera clonare il repository.
+
+### Se i file WAV (registrazioni audio) NON sono necessari
+
+```bash
+git clone --filter=blob:none --no-checkout \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+
+cd atlas-enharmonic-spectra
+
+git sparse-checkout init --no-cone
+git sparse-checkout set '/*' '!/wav/'
+
+git checkout
+```
+
+La directory `wav/` viene esclusa dal checkout, mentre tutti gli altri file e directory vengono scaricati. I file CSV (matrici delle distanze) e gli altri file gestiti tramite Git LFS vengono comunque scaricati normalmente.
+
+### Se i file WAV (registrazioni audio) sono necessari
+
+```bash
+git clone \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+```
 
 ## 🏷️ Convenzioni di denominazione dei file
 

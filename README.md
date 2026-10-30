@@ -32,9 +32,9 @@ It is intended as a practical resource for composition, orchestration, performan
 
 - **2,655 WAV recordings** (chromatic long tones; continuously expanding)
 
-  - Sampling rate: $f_s=96\ \mathrm{kHz}$
+  - Sampling rate: $f_{\text s}=96\ \mathrm{kHz}$
   - Number of samples: $N=2^{20}$
-  - Standardized duration: $N/f_s=10.\ 922\ 666\ldots\ \mathrm{sec}$
+  - Standardized duration: $N/f_{\text s}=10.\ 922\ 666\ldots\ \mathrm{sec}$
   - See [*Sparse FFT: A New High-Resolution Frequency Analysis and Its Applications*](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/).
 
 - Unified file-naming conventions including written pitch, concert pitch, and performance conditions
@@ -63,6 +63,33 @@ atlas-enharmonic-spectra/
 ```
 
 Each instrument directory contains chromatic long-tone recordings. Some instruments additionally include alternative fingerings, mute conditions, and other performance variants.
+
+## 🐑 Cloning (≈ Downloading)
+
+In the parent directory where you want to clone the repository, run one of the following commands.
+
+### When WAV files (recorded audio) are NOT required
+
+```bash
+git clone --filter=blob:none --no-checkout \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+
+cd atlas-enharmonic-spectra
+
+git sparse-checkout init --no-cone
+git sparse-checkout set '/*' '!/wav/'
+
+git checkout
+```
+
+This excludes the `wav/` directory from the checkout and retrieves all other files and directories. CSV files (distance matrices) and other files managed by Git LFS are still downloaded as usual.
+
+### When WAV files (recorded audio) are required
+
+```bash
+git clone \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+```
 
 ## 🏷️ File Naming
 

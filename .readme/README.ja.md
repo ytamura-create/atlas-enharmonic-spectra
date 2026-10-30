@@ -38,9 +38,9 @@
 
 - **43種類の楽器カテゴリ**（木管・金管・弦楽器・基準信号など。継続的に追加予定）
 - **2655件のWAV録音**（半音階ロングトーン。継続的に追加予定）
-    * サンプリング周波数： $f_s=96\ \mathrm{kHz}$、
+    * サンプリング周波数： $f_{\text s}=96\ \mathrm{kHz}$、
     * サンプル数： $N = 2^{20}$、
-    * ∴ データ長： $N/f_s = 10.\ 922\ 666...\ \ \mathrm{sec}$ に統一。
+    * ∴ データ長： $N/f_{\text s} = 10.\ 922\ 666...\ \ \mathrm{sec}$ に統一。
     * [*Sparse FFT：新しい高分解能周波数解析とその応用*](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/) を参照のこと。
 - 記譜音・実音・演奏条件などを含む統一的なファイル命名規則
 - スペクトル間 L1・L2 Wasserstein距離の計算スクリプト
@@ -66,6 +66,35 @@ atlas-enharmonic-spectra/
 ```
 
 各楽器ディレクトリには半音階ごとのロングトーン録音が収録されています。楽器によっては、替え指・ミュート・その他の演奏条件の違いも含まれています。
+
+## 🐑 クローン（≒ ダウンロード）方法
+
+クローン先の親ディレクトリで、以下のいずれかを実行してください。
+
+### WAV ファイル（録音音源）が不要な場合
+
+```bash
+git clone --filter=blob:none --no-checkout \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+
+cd atlas-enharmonic-spectra
+
+git sparse-checkout init --no-cone
+git sparse-checkout set '/*' '!/wav/'
+
+git checkout
+```
+
+`wav/` ディレクトリをチェックアウト対象から除外し、それ以外のファイルやディレクトリを取得します。Git LFS で管理されている CSV ファイル（距離行列）などは通常どおり取得されます。
+
+### WAV ファイル（録音音源）を含める場合
+
+```bash
+git clone \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+```
+
+リポジトリ全体を取得します。録音音源を含め、すべてのファイルがダウンロードされます。
 
 ## 🏷️ ファイル命名規則
 

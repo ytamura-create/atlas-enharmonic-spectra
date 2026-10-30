@@ -36,9 +36,9 @@
 
 - **43 категории инструментов**: деревянные и медные духовые, струнные, эталонные сигналы и другие категории. Набор постоянно расширяется.
 - **2655 WAV-записей** протяжённых звуков по всем хроматическим ступеням. Коллекция постоянно расширяется.
-  - Частота дискретизации: $f_s=96\ \mathrm{kHz}$.
+  - Частота дискретизации: $f_{\text s}=96\ \mathrm{kHz}$.
   - Число отсчётов: $N=2^{20}$.
-  - Единая длительность записи: $N/f_s=10.922666\ldots\ \mathrm{sec}$.
+  - Единая длительность записи: $N/f_{\text s}=10.922666\ldots\ \mathrm{sec}$.
   - См. работу [*Sparse FFT: A New High-Resolution Frequency Analysis and Its Applications*](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/).
 - Единые правила именования файлов с указанием нотной записи, звучащей высоты и условий исполнения.
 - Скрипты вычисления расстояний Васерштейна $L^1$ и $L^2$ между спектрами.
@@ -64,6 +64,33 @@ atlas-enharmonic-spectra/
 ```
 
 Каждая папка инструмента содержит записи протяжённых звуков по хроматическим ступеням. Для некоторых инструментов также представлены альтернативные аппликатуры, варианты с сурдинами и другие исполнительские условия.
+
+## 🐑 Клонирование (≈ Загрузка)
+
+Выполните одну из следующих команд в родительском каталоге, в котором вы хотите разместить клонированный репозиторий.
+
+### Если файлы WAV (аудиозаписи) НЕ нужны
+
+```bash
+git clone --filter=blob:none --no-checkout \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+
+cd atlas-enharmonic-spectra
+
+git sparse-checkout init --no-cone
+git sparse-checkout set '/*' '!/wav/'
+
+git checkout
+```
+
+Каталог `wav/` исключается из процесса checkout, а все остальные файлы и каталоги загружаются. CSV-файлы (матрицы расстояний) и другие файлы, управляемые с помощью Git LFS, по-прежнему загружаются в обычном режиме.
+
+### Если файлы WAV (аудиозаписи) нужны
+
+```bash
+git clone \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+```
 
 ## 🏷️ Правила именования файлов
 
@@ -94,15 +121,15 @@ basstrb045_F4_ovt-06_pos-I.wav
 
 В *Harmonielehre* (1911) Арнольд Шёнберг писал:
 
-> *«…solche Folgen herzustellen, deren Beziehung untereinander mit einer Art Logik wirkt, ganz äquivalent jener Logik, die uns bei der Melodie der Klanghöhen genügt.»*
+> *«…solche **Folgen** herzustellen, deren Beziehung untereinander mit einer Art Logik wirkt, ganz äquivalent jener Logik, die uns bei der Melodie der Klanghöhen genügt.»*
 
-> «…создавать такие последовательности, взаимосвязи между элементами которых действовали бы согласно некоторой логике, полностью эквивалентной той, которая удовлетворяет нас в мелодии высот».
+> *«…создавать такие **последовательности**, взаимосвязи между элементами которых действовали бы согласно некоторой логике, полностью эквивалентной той, которая удовлетворяет нас в мелодии высот».*
 
 Шёнберг полагал, что подобный подход однажды станет возможным. При этом он признавал, что в его время эта идея оставалась лишь проектом будущего:
 
 > *«Das scheint eine Zukunftsphantasie und ist es wahrscheinlich auch. Aber eine, von der ich fest glaube, daß sie sich verwirklichen wird.»*
 
-> «Это кажется фантазией о будущем и, вероятно, ею и является. Но я твёрдо верю, что однажды она осуществится».
+> *«Это кажется фантазией о будущем и, вероятно, ею и является. Но я твёрдо верю, что однажды она осуществится».*
 
 Эта **фантазия о будущем** впоследствии вдохновляла многих композиторов, в том числе **Веберна**, **Мессиана**, **Ноно**, **Булеза** и **Штокхаузена**. Особенно послевоенный сериализм расширил принципы организации музыки: наряду с высотой звука объектами организации стали длительность, динамика и тембр. Однако универсальный принцип, позволяющий сопоставлять тембры разных инструментов так же систематически, как высоты звуков, не получил достаточного развития в музыкальной практике.
 
@@ -120,7 +147,7 @@ basstrb045_F4_ovt-06_pos-I.wav
 
 В данном репозитории этот подход применяется к анализу тембра. Изменение тембра описывается как минимальная стоимость переноса, необходимого для перемещения спектральной массы от одного нормированного спектрального распределения к другому.
 
-Для одномерных вероятностных распределений $P,Q$ расстояние Вассерштейна порядка $p$ ($p\ge 1$) можно записать с помощью обобщённых обратных функций (квантильных функций) ${F_P}^{-1},{F_Q}^{-1}$ функций распределения $F_P,F_Q$ в виде
+Для одномерных вероятностных распределений $P,Q$ расстояние Васерштейна порядка $p$ ($p\ge 1$) можно записать с помощью обобщённых обратных функций (квантильных функций) ${F_P}^{-1},{F_Q}^{-1}$ функций распределения $F_P,F_Q$ в виде
 
 $$\mathcal W_p(P,Q)=\left(\int_{0}^{1}\Bigl\lvert F_P^{-1}(u)-F_Q^{-1}(u)\Bigr\rvert^p\ \mathrm du\right)^{1/p}.$$
 
@@ -141,7 +168,7 @@ cdf_P = np.cumsum(spectrum_P)
 cdf_Q = np.cumsum(spectrum_Q)
 ```
 
-а расстояние Вассерштейна $L^1$ ($p=1$) между дискретными рядами данных рассчитывается по формуле
+а расстояние Васерштейна $L^1$ ($p=1$) между дискретными рядами данных рассчитывается по формуле
 
 $$\mathcal W_1(P,Q)=\sum_i{\Bigl\lvert F_P[i]-F_Q[i]\Bigr\rvert\ \Delta f}$$
 
@@ -180,8 +207,8 @@ $$
 
 ## 📖 Литература
 
-1. Arnold Schönberg. *Harmonielehre*. Universal Edition, Vienna (1911).
-2. Shun-ichi Amari. “Differential Geometry of Curved Exponential Families—Curvatures and Information Loss.” *The Annals of Statistics* 10(2), pp. 357–385 (1982).
-3. Shun-ichi Amari. *Differential-Geometrical Methods in Statistics*. Lecture Notes in Statistics, 28. Springer-Verlag (1985).
-4. Jinyong Lee and Ken Ito. “Sparse FFT: A New High-Resolution Frequency Analysis and Its Applications.” *JASTICE* 8(2), pp. 188–193 (2021/2022). [Ссылка на публикацию](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/).
-5. Yusei Tamura, Shigekazu Ishihara, and Ken Ito. *Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*. arXiv:2608.28026 (2026). [https://arxiv.org/abs/2608.28026](https://arxiv.org/abs/2608.28026).
+1. Arnold Schönberg (Арнольд Шёнберг). *Harmonielehre*. Universal Edition, Vienna (1911).
+2. Shun-ichi Amari (Сюнъити Амари). “Differential Geometry of Curved Exponential Families—Curvatures and Information Loss.” *The Annals of Statistics* **10**(2), pp. 357–385 (1982).
+3. Shun-ichi Amari (Сюнъити Амари). *Differential-Geometrical Methods in Statistics*. Lecture Notes in Statistics, **28**. Springer-Verlag (1985).
+4. Jinyoung Lee (Чинён Ли) and Ken Ito (Кэн Ито). “Sparse FFT: A New High-Resolution Frequency Analysis and Its Applications.” *JASTICE* **8**(2), pp. 188–193 (2021/2022). [Ссылка на публикацию](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/).
+5. Yusei Tamura (Юсэй Тамура), Shigekazu Ishihara (Сигэкадзу Исихара), and Ken Ito (Кэн Ито). *Klangfarbenakkord and Klangfarbenharmonien: Metric Space Models for Music on Informational Geometry 1*. arXiv:2608.28026 (2026). https://arxiv.org/abs/2608.28026

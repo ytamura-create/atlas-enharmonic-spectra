@@ -38,11 +38,11 @@ Il est conçu comme un outil pratique destiné à la composition, à l'orchestra
 
 - **2 655 enregistrements WAV** (sons tenus chromatiques ; extension continue)
 
-  - Fréquence d'échantillonnage : $f_s=96\ \mathrm{kHz}$
+  - Fréquence d'échantillonnage : $f_{\text s}=96\ \mathrm{kHz}$
 
   - Nombre d'échantillons : $N=2^{20}$
 
-  - Durée normalisée : $N/f_s=10.922666\ldots\ \mathrm{sec}$
+  - Durée normalisée : $N/f_{\text s}=10.922666\ldots\ \mathrm{sec}$
 
   - Voir [*Sparse FFT: A New High-Resolution Frequency Analysis and Its Applications*](https://jastice.org/2022/05/16/vol-8-2-pp-188-193-2021-2022/).
 
@@ -72,6 +72,33 @@ atlas-enharmonic-spectra/
 ```
 
 Chaque dossier d'instrument contient des enregistrements de sons tenus chromatiques. Certains instruments comprennent également des doigtés alternatifs, des sourdines et d'autres variantes d'exécution.
+
+## 🐑 Clonage (≈ Téléchargement)
+
+Exécutez l'une des commandes suivantes dans le répertoire parent où vous souhaitez cloner le dépôt.
+
+### Si les fichiers WAV (enregistrements audio) ne sont PAS nécessaires
+
+```bash
+git clone --filter=blob:none --no-checkout \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+
+cd atlas-enharmonic-spectra
+
+git sparse-checkout init --no-cone
+git sparse-checkout set '/*' '!/wav/'
+
+git checkout
+```
+
+Le répertoire `wav/` est exclu de l'extraction, tandis que tous les autres fichiers et répertoires sont récupérés. Les fichiers CSV (matrices de distance) ainsi que les autres fichiers gérés par Git LFS sont téléchargés normalement.
+
+### Si les fichiers WAV (enregistrements audio) sont nécessaires
+
+```bash
+git clone \
+    https://github.com/ytamura-create/atlas-enharmonic-spectra.git
+```
 
 ## 🏷️ Nommage des fichiers
 
